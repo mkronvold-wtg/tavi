@@ -30,6 +30,25 @@ The scheduled refresh workflow runs from the default branch, rebuilds the same t
 
 It intentionally does not publish `sha-*` tags because a refresh is not tied to a new source commit.
 
+## Container vulnerability scanning
+
+The `Scan container images` workflow uses Trivy to scan the API, web, and worker
+images for `HIGH` and `CRITICAL` vulnerabilities. Findings are uploaded as SARIF
+to GitHub Security > Code scanning alerts under separate `trivy-api`, `trivy-web`,
+and `trivy-worker` categories.
+
+- Pull requests, `main` pushes, and manual runs build and scan the candidate
+  images locally.
+- A successful scheduled image refresh triggers a scan of the published GHCR
+  `latest` images.
+- The workflow is report-only: vulnerabilities create Security alerts without
+  blocking image publication. Scan or SARIF-upload failures still fail the
+  workflow.
+
+Review the initial alert baseline before making a vulnerability threshold
+blocking. Document accepted exceptions in the version-controlled
+`.trivyignore.yaml` file with an ID, rationale, and expiration date.
+
 ## Dependency PR automation
 
 Dependabot is configured for:

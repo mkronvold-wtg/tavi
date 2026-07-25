@@ -1,0 +1,142 @@
+name: Scan container images
+
+on:
+  pull_request:
+    paths:
+      - ".dockerignore"
+      - ".trivyignore.yaml"
+      - ".github/workflows/publish-images.yml"
+      - ".github/workflows/refresh-images.yml"
+      - ".github/workflows/trivy-scan.yml"
+      - "apps/**"
+      - "packages/**"
+      - "infra/docker/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - "tsconfig.base.json"
+  push:
+    branches:
+      - main
+    paths:
+      - ".dockerignore"
+      - ".trivyignore.yaml"
+      - ".github/workflows/publish-images.yml"
+      - ".github/workflows/refresh-images.yml"
+      - ".github/workflows/trivy-scan.yml"
+      - "apps/**"
+      - "packages/**"
+      - "infra/docker/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - "tsconfig.base.json"
+  workflow_run:
+    workflows:
+      - Refresh container images
+    types:
+      - completed
+  workflow_dispatch:
+
+concurrency:
+  group: trivy-scan-${{ github.event.pull_request.number || github.ref || github.event.workflow_run.id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: read
+  security-events: write
+
+jobs:
+  scan-local-images:
+    name: Scan ${{ matrix.service }} image
+    if: github.event_name != 'workflow_run'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api
+            dockerfile: infra/docker/api.Dockerfile
+          - service: web
+            dockerfile: infra/docker/web.Dockerfile
+          - service: worker
+            dockerfile: infra/docker/worker.Dockerfile
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Build image
+        run: |
+          docker build \
+            --file "${{ matrix.dockerfile }}" \
+            --tag "tavi-${{ matrix.service }}:${{ github.sha }}" \
+            .
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: tavi-${{ matrix.service }}:${{ github.sha }}
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: HIGH,CRITICAL
+          limit-severities-for-sarif: "true"
+          scanners: vuln
+          trivyignores: .trivyignore.yaml
+          exit-code: "0"
+
+      - name: Upload scan results
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+          category: trivy-${{ matrix.service }}
+
+  scan-refreshed-images:
+    name: Scan refreshed ${{ matrix.service }} image
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api
+            image: tavi-api
+          - service: web
+            image: tavi-web
+          - service: worker
+            image: tavi-worker
+    steps:
+      - name: Check out refresh policy
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan refreshed image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/tavi-${{ matrix.service }}:latest
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: HIGH,CRITICAL
+          limit-severities-for-sarif: "true"
+          scanners: vuln
+          trivyignores: .trivyignore.yaml
+          exit-code: "0"
+
+      - name: Upload scan results
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+          category: trivy-${{ matrix.service }}
