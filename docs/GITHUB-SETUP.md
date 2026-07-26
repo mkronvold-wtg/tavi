@@ -8,7 +8,8 @@ This page lists repository settings that support Tavi's lifecycle automation.
 2. Enable GitHub Packages access for `GITHUB_TOKEN` so workflows can publish GHCR images.
 3. Enable Dependabot alerts and Dependabot security updates.
 4. Enable Dependabot version updates from `.github/dependabot.yml`.
-5. Enable auto-merge for the repository if patch/minor Dependabot PRs should merge automatically after required checks pass.
+5. Enable code scanning so Trivy SARIF findings appear under GitHub Security.
+6. Enable auto-merge for the repository if patch/minor Dependabot PRs should merge automatically after required checks pass.
 
 ## Workflow permissions
 
@@ -16,6 +17,12 @@ The image workflows use `GITHUB_TOKEN` with:
 
 - `contents: read`
 - `packages: write`
+
+The Trivy scanning workflow uses:
+
+- `contents: read`
+- `packages: read`
+- `security-events: write`
 
 The Dependabot auto-merge workflow uses `pull_request_target` and does not check out PR code. It needs:
 
@@ -30,6 +37,7 @@ Use branch protection on `main` so auto-merge waits for required checks. Recomme
 
 1. `Validate workspace`
 2. container image build jobs from `Publish container images`
+3. `Scan api image`, `Scan web image`, and `Scan worker image`
 
 Keep major dependency updates manual even when auto-merge is enabled.
 
