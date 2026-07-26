@@ -64,20 +64,24 @@ published GHCR `latest` images. Findings are separated by SARIF category:
 Review findings in **GitHub Security > Code scanning alerts**. The workflow
 uses `security-events: write`; remote-image scans also use `packages: read`.
 
-### Baseline policy
+### Enforced policy
 
-The scan remains report-only while the minimized, digest-pinned images are
-triaged. First remediate findings through dependency updates, base-image digest
-updates, or image-content reduction. Only unavoidable findings may be added to
-[`.trivyignore.yaml`](../.trivyignore.yaml), with:
+The scan fails on every High/Critical finding. The minimized, digest-pinned
+baseline reduced each image from 428 results to 27/28 results; the remaining
+unfixed upstream Debian and Prisma CLI findings have individually reviewed,
+time-boxed exceptions in [`.trivyignore.yaml`](../.trivyignore.yaml).
+
+First remediate findings through dependency updates, base-image digest updates,
+or image-content reduction. Only unavoidable findings may be added to the
+exception registry, with:
 
 1. A specific vulnerability `id`
 2. An owner and mitigation in `statement`
 3. An `expired_at` date
 
-Once that baseline is clean or has only time-boxed exceptions, change the scan
-exit code to fail on all High/Critical findings and require the three service
-scan jobs on `main`. Do not add broad, permanent suppressions.
+Remove an exception as soon as the upstream fix is published. The three service
+scan jobs are required checks on `main`; do not add broad or permanent
+suppressions.
 
 ## Pull-request expectations
 

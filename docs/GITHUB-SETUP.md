@@ -41,17 +41,13 @@ Repository settings must allow GitHub Actions to create and approve pull request
 ## Branch protection
 
 Use branch protection on `main` so auto-merge waits for required checks.
-Require these checks immediately:
+Require:
 
 1. `Validate workspace`
 2. container image build jobs from `Publish container images`
-
-After the Trivy baseline is remediated or time-boxed and the workflow exit code
-is made blocking, also require:
-
-1. `Scan api image`
-2. `Scan web image`
-3. `Scan worker image`
+3. `Scan api image`
+4. `Scan web image`
+5. `Scan worker image`
 
 Keep major dependency updates manual even when auto-merge is enabled. Confirm
 that Dependabot security updates are enabled in repository settings as well as
