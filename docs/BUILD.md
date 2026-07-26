@@ -10,6 +10,7 @@ want a no-build runtime that pulls the published images instead, use
 
 1. Git
 2. Docker Engine with the `docker compose` plugin available
+3. Node 26 for any commands run directly on the host
 
 ## Start the stack
 

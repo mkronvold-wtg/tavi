@@ -53,7 +53,9 @@ The local containers are named `tavi-postgres`, `tavi-api`, `tavi-web`, and `tav
 
 If you need the header logo link to point somewhere other than the current local URL, set `TAVI_HOME_URL` before running `./scripts/dev-up`. The Kubernetes web deployment reads the same `TAVI_HOME_URL` value from the chosen variant's `configmap.yaml` under [`infra/k8s/`](./infra/k8s/README.md).
 
-The local dev stack still uses Vite dev mode through Compose. The published `tavi-web` image now defaults to its static production server, and only uses Vite preview when you explicitly override the container command with `start:preview`.
+The local dev stack uses Vite dev mode through Compose. The published
+`tavi-web` image serves only its static production assets through its built-in
+Node server.
 
 ## Container publishing
 
@@ -63,7 +65,10 @@ GitHub Actions publishes the production image set from `infra/docker` to GHCR:
 - `ghcr.io/mkronvold/tavi-web`
 - `ghcr.io/mkronvold/tavi-worker`
 
-The `publish-images.yml` workflow builds all three images on pull requests, then pushes branch, tag, and `sha-*` tags on `main`, version tags, or manual dispatch. The raw Kubernetes manifests currently consume the `latest` tag on the default branch.
+The `publish-images.yml` workflow builds all three images on pull requests,
+then pushes branch, tag, and `sha-*` tags on `main`, version tags, or manual
+dispatch. Version tags create a reviewable release-pin pull request; Compose
+and Kubernetes consume immutable `tag@sha256:digest` references.
 
 ### Local login accounts
 

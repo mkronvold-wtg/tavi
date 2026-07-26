@@ -11,7 +11,9 @@ on:
       - "apps/**"
       - "packages/**"
       - "infra/docker/**"
+      - "scripts/update-release-pins.mjs"
       - "package.json"
+      - ".node-version"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "turbo.json"
@@ -30,7 +32,9 @@ on:
       - "apps/**"
       - "packages/**"
       - "infra/docker/**"
+      - "scripts/update-release-pins.mjs"
       - "package.json"
+      - ".node-version"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "turbo.json"
@@ -54,7 +58,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .node-version
 
       - name: Enable Corepack
         run: corepack enable
@@ -74,12 +78,17 @@ jobs:
       - name: Typecheck
         run: corepack pnpm typecheck
 
+      - name: Test
+        run: corepack pnpm test
+
   build-and-publish:
     name: Build ${{ matrix.service }} image
     needs: validate
     runs-on: ubuntu-latest
     permissions:
+      attestations: write
       contents: read
+      id-token: write
       packages: write
     strategy:
       fail-fast: false
@@ -133,6 +142,7 @@ jobs:
             org.opencontainers.image.title=${{ matrix.image }}
 
       - name: Build and publish image
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -146,3 +156,109 @@ jobs:
             TAVI_BUILD_DATE=${{ steps.build-metadata.outputs.date }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,scope=${{ matrix.image }},mode=max,ignore-error=true
+          provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || 'false' }}
+          sbom: ${{ github.event_name != 'pull_request' }}
+
+      - name: Generate CycloneDX SBOM
+        if: github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ steps.vars.outputs.owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          format: cyclonedx
+          output: ${{ matrix.service }}.cdx.json
+          exit-code: "0"
+
+      - name: Upload CycloneDX SBOM
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.service }}-cyclonedx
+          path: ${{ matrix.service }}.cdx.json
+          retention-days: 180
+
+      - name: Scan published image with Trivy
+        if: github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ steps.vars.outputs.owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          format: table
+          output: ${{ matrix.service }}-trivy.txt
+          severity: HIGH,CRITICAL
+          scanners: vuln
+          trivyignores: .trivyignore.yaml
+          exit-code: "0"
+
+      - name: Upload published image scan report
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.service }}-trivy-report
+          path: ${{ matrix.service }}-trivy.txt
+          retention-days: 180
+
+      - name: Save published image digest
+        if: github.event_name != 'pull_request'
+        run: printf '%s\n' '${{ steps.build.outputs.digest }}' > ${{ matrix.service }}.digest
+
+      - name: Upload published image digest
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-digest-${{ matrix.service }}
+          path: ${{ matrix.service }}.digest
+          retention-days: 180
+
+  create-release-pin-pull-request:
+    name: Create immutable release-pin pull request
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build-and-publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out default branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Normalize GHCR owner
+        id: vars
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Download published image digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: image-digest-*
+          path: image-digests
+          merge-multiple: true
+
+      - name: Update immutable image references
+        env:
+          API_DIGEST_FILE: image-digests/api.digest
+          RELEASE_TAG: ${{ github.ref_name }}
+          GHCR_OWNER: ${{ steps.vars.outputs.owner }}
+          WEB_DIGEST_FILE: image-digests/web.digest
+          WORKER_DIGEST_FILE: image-digests/worker.digest
+        run: |
+          set -euo pipefail
+          api_digest="$(cat "$API_DIGEST_FILE")"
+          web_digest="$(cat "$WEB_DIGEST_FILE")"
+          worker_digest="$(cat "$WORKER_DIGEST_FILE")"
+
+          node scripts/update-release-pins.mjs \
+            --api "ghcr.io/$GHCR_OWNER/tavi-api:$RELEASE_TAG@$api_digest" \
+            --web "ghcr.io/$GHCR_OWNER/tavi-web:$RELEASE_TAG@$web_digest" \
+            --worker "ghcr.io/$GHCR_OWNER/tavi-worker:$RELEASE_TAG@$worker_digest"
+
+      - name: Create release-pin pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: automation/release-pins-${{ github.ref_name }}
+          commit-message: "chore(release): pin ${{ github.ref_name }} image digests"
+          delete-branch: true
+          body: |
+            Pins Docker Compose and every supported Kubernetes deployment variant to the immutable images published for `${{ github.ref_name }}`.
+
+            Each image uses both the release tag and its content digest. Review and merge this promotion pull request to deploy the release.
+          title: "chore(release): pin ${{ github.ref_name }} images"

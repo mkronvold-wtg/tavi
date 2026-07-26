@@ -74,39 +74,33 @@ kubectl logs -n tavi deployment/tavi-api -c api --previous \
   | rg 'auth.bootstrap.initial_admin_created|initialPassword'
 ```
 
-The web image now defaults to serving built assets through its static server. If you intentionally need `vite preview` for a temporary diagnostic deployment, override the web container args instead of changing the image:
+The web image serves only its built assets through the static Node server.
+Vite preview is a development-only tool and is not included in the production
+image.
 
-```yaml
-containers:
-  - name: web
-    args: ["start:preview"]
-```
+## Immutable image releases
 
-Keep that override out of steady-state production deployments.
-
-## Image lifecycle and refreshed `latest` tags
-
-Tavi's lifecycle workflow refreshes `ghcr.io/mkronvold/tavi-api`,
-`ghcr.io/mkronvold/tavi-web`, and `ghcr.io/mkronvold/tavi-worker` weekly with
-fresh base layers. The raw manifests use `:latest` for those app images and set
-their app container `imagePullPolicy` values to `Always`, so a rollout restart
-will pull the refreshed tag instead of reusing a cached node image.
-
-After a refresh, replace running app pods with:
+Every app deployment now uses a `tag@sha256:digest` reference with
+`imagePullPolicy: IfNotPresent`. A version-tagged image publish opens a
+release-pin pull request that updates all four Kubernetes variants together.
+Review and merge that PR, then apply the selected variant:
 
 ```bash
-kubectl rollout restart deployment/tavi-api -n tavi
-kubectl rollout restart deployment/tavi-web -n tavi
-kubectl rollout restart deployment/tavi-worker -n tavi
+kubectl apply -k infra/k8s/k8s-with-external-db
 kubectl rollout status deployment/tavi-api -n tavi
 kubectl rollout status deployment/tavi-web -n tavi
 kubectl rollout status deployment/tavi-worker -n tavi
 ```
 
-Raw Kubernetes-only pins such as the CloudNativePG operator bundle,
-`postgres:16-alpine`, and backup post-processing `alpine:3.22` examples remain
-manual lifecycle review items for now. See [`LCM.md`](./LCM.md) for the full
-container lifecycle policy.
+Use the matching variant path in place of `k8s-with-external-db`. To roll back,
+revert the release-pin commit, reapply the selected variant, and watch the
+same rollout statuses. Candidate `latest` and weekly `refresh-*` images are
+not deployment inputs.
+
+Third-party Node, PostgreSQL, and Alpine image inputs are also digest-pinned
+and updated by Dependabot. The CloudNativePG operator bundle remains a
+separately reviewed remote-manifest lifecycle item. See [`LCM.md`](./LCM.md)
+for the full policy.
 
 ## Backups and restore
 
@@ -143,9 +137,9 @@ kubectl logs -n tavi deployment/tavi-api -c migrate --tail=200
 kubectl logs -n tavi deployment/tavi-web -c web --tail=200
 kubectl logs -n tavi deployment/tavi-worker -c worker --tail=200
 
-kubectl rollout restart deployment/tavi-api -n tavi
-kubectl rollout restart deployment/tavi-web -n tavi
-kubectl rollout restart deployment/tavi-worker -n tavi
+kubectl rollout status deployment/tavi-api -n tavi
+kubectl rollout status deployment/tavi-web -n tavi
+kubectl rollout status deployment/tavi-worker -n tavi
 ```
 
 Database-specific checks depend on the selected path:

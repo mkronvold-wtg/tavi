@@ -21,8 +21,8 @@ spec:
         fsGroup: 1000
       initContainers:
         - name: migrate
-          image: ghcr.io/mkronvold/tavi-api:latest
-          imagePullPolicy: Always
+          image: ghcr.io/mkronvold/tavi-api:sha-fedc290@sha256:ebd6602d9440f400be6bfdaa7301afd16958c35fcf749bc739863839fbe996ed
+          imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:
               type: RuntimeDefault
@@ -43,7 +43,7 @@ spec:
               cpu: 500m
               ephemeral-storage: 256Mi
               memory: 256Mi
-          command: ["pnpm", "--filter", "@tavi/api", "prisma:migrate"]
+          command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
           env:
             - name: PORT
               valueFrom:
@@ -67,8 +67,8 @@ spec:
                   key: COOKIE_SECRET
       containers:
         - name: api
-          image: ghcr.io/mkronvold/tavi-api:latest
-          imagePullPolicy: Always
+          image: ghcr.io/mkronvold/tavi-api:sha-fedc290@sha256:ebd6602d9440f400be6bfdaa7301afd16958c35fcf749bc739863839fbe996ed
+          imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:
               type: RuntimeDefault

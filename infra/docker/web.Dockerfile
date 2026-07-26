@@ -1,4 +1,4 @@
-FROM node:26-bookworm AS builder
+FROM node:26-bookworm@sha256:219fc9da91e7f29a9f32290ff598cdf8886fd68f421ff515c8f93434da39a271 AS builder
 
 WORKDIR /app
 ARG PNPM_VERSION=10.33.0
@@ -26,12 +26,15 @@ RUN pnpm --filter @tavi/config build \
   && pnpm --filter @tavi/schemas build \
   && pnpm --filter @tavi/web build
 
-RUN mkdir -p /app/apps/web/node_modules/.vite-temp \
-  && chown 1000:1000 /app/apps/web/node_modules/.vite-temp \
-  && rm -f /app/apps/web/dist/runtime-config.js \
-  && ln -s /tmp/tavi-runtime-config.js /app/apps/web/dist/runtime-config.js
+FROM node:26-bookworm-slim@sha256:2d49d876e96237d76de412761cf05dbfe5aee325cc4406a4d41d5824c5bb8beb AS runtime
 
-USER 1000:1000
+WORKDIR /app
+ENV NODE_ENV=production
 
-ENTRYPOINT ["bash", "infra/docker/web-entrypoint.sh"]
-CMD ["start"]
+COPY --from=builder --chown=node:node /app/apps/web/dist ./dist
+COPY --from=builder --chown=node:node /app/apps/web/scripts/serve-dist.mjs ./scripts/serve-dist.mjs
+COPY --from=builder --chown=node:node /app/infra/docker/web-entrypoint.sh ./web-entrypoint.sh
+
+USER node
+
+ENTRYPOINT ["sh", "/app/web-entrypoint.sh"]

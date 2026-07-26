@@ -42,3 +42,23 @@ updates:
         update-types:
           - minor
           - patch
+
+  - package-ecosystem: docker
+    directory: /infra/k8s/k8s-with-external-db
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /infra/k8s/k8s-with-internal-db
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /infra/k8s/k8s-with-replicas-and-external-db
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /infra/k8s/k8s-with-replicas-and-internal-ha-db
+    schedule:
+      interval: weekly

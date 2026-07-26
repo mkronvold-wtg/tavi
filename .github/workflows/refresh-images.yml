@@ -10,7 +10,9 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  attestations: write
   contents: read
+  id-token: write
   packages: write
 
 jobs:
@@ -36,7 +38,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .node-version
 
       - name: Enable Corepack
         run: corepack enable
@@ -55,6 +57,9 @@ jobs:
 
       - name: Typecheck
         run: corepack pnpm typecheck
+
+      - name: Test
+        run: corepack pnpm test
 
   refresh:
     name: Refresh ${{ matrix.service }} image
@@ -112,6 +117,7 @@ jobs:
             org.opencontainers.image.title=${{ matrix.image }}
 
       - name: Build and publish refreshed image
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -124,3 +130,38 @@ jobs:
           build-args: |
             TAVI_BUILD_SHA=${{ github.sha }}
             TAVI_BUILD_DATE=${{ steps.build-metadata.outputs.date }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Generate CycloneDX SBOM
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ steps.vars.outputs.owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          format: cyclonedx
+          output: ${{ matrix.service }}.cdx.json
+          exit-code: "0"
+
+      - name: Upload CycloneDX SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: refresh-${{ matrix.service }}-cyclonedx
+          path: ${{ matrix.service }}.cdx.json
+          retention-days: 180
+
+      - name: Scan published image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ steps.vars.outputs.owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          format: table
+          output: ${{ matrix.service }}-trivy.txt
+          severity: HIGH,CRITICAL
+          scanners: vuln
+          trivyignores: .trivyignore.yaml
+          exit-code: "0"
+
+      - name: Upload published image scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: refresh-${{ matrix.service }}-trivy-report
+          path: ${{ matrix.service }}-trivy.txt
+          retention-days: 180
