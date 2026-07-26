@@ -11,6 +11,9 @@ vulnerabilities:
   - id: CVE-2026-12151
     statement: "Owner: platform. The fixed undici version is bundled in the required Prisma 7 migration CLI; remove after Prisma publishes the fix."
     expired_at: 2026-08-31
+  - id: CVE-2026-13149
+    statement: "Owner: platform. The fixed brace-expansion version is bundled in the required Prisma 7 migration CLI; remove after Prisma publishes the fix."
+    expired_at: 2026-08-31
   - id: CVE-2026-13221
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
     expired_at: 2026-08-31
