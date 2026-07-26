@@ -18,6 +18,8 @@ Tavi currently ships as a TypeScript monorepo with:
 - `docs/BUILD.md` - source-based Docker Compose development guide
 - `docs/DOCKER.md` - prebuilt GHCR image runtime guide
 - `docs/KUBERNETES.md` - raw-manifest deployment and day-2 operations
+- `docs/CI.md` - GitHub Actions validation, image scanning, and code-scanning alerts
+- `docs/LCM.md` - container image refreshes and dependency lifecycle management
 - `docs/DESIGN.md` and `docs/ARCHITECTURE.md` - product and technical reference specs
 
 ### Run locally from source with Docker Compose

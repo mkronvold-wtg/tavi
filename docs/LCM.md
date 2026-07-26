@@ -30,6 +30,9 @@ The scheduled refresh workflow runs from the default branch, rebuilds the same t
 
 It intentionally does not publish `sha-*` tags because a refresh is not tied to a new source commit.
 
+See [`CI.md`](./CI.md) for validation, container build, and vulnerability
+scanning behavior.
+
 ## Dependency PR automation
 
 Dependabot is configured for:

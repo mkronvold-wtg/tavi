@@ -1,0 +1,6 @@
+# Approved Trivy exceptions. Every entry must include an ID, a risk statement,
+# and an expiration date so suppressions are reviewed and removed promptly.
+vulnerabilities: []
+misconfigurations: []
+secrets: []
+licenses: []
