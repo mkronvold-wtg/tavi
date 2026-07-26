@@ -16,7 +16,7 @@ x-tavi-api-env: &tavi-api-env
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-tavi}
@@ -38,16 +38,16 @@ services:
       retries: 30
 
   migrate:
-    image: ghcr.io/mkronvold/tavi-api:${TAVI_TAG:-latest}
+    image: ${TAVI_API_IMAGE:?Set TAVI_API_IMAGE from compose-prod.images.env}
     restart: "no"
     environment: *tavi-api-env
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["pnpm", "--filter", "@tavi/api", "prisma:migrate"]
+    command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
 
   api:
-    image: ghcr.io/mkronvold/tavi-api:${TAVI_TAG:-latest}
+    image: ${TAVI_API_IMAGE:?Set TAVI_API_IMAGE from compose-prod.images.env}
     restart: unless-stopped
     environment: *tavi-api-env
     ports:
@@ -73,7 +73,7 @@ services:
       start_period: 10s
 
   worker:
-    image: ghcr.io/mkronvold/tavi-worker:${TAVI_TAG:-latest}
+    image: ${TAVI_WORKER_IMAGE:?Set TAVI_WORKER_IMAGE from compose-prod.images.env}
     restart: unless-stopped
     environment:
       <<: *tavi-common-env
@@ -104,7 +104,7 @@ services:
       start_period: 10s
 
   web:
-    image: ghcr.io/mkronvold/tavi-web:${TAVI_TAG:-latest}
+    image: ${TAVI_WEB_IMAGE:?Set TAVI_WEB_IMAGE from compose-prod.images.env}
     restart: unless-stopped
     environment:
       NODE_ENV: production

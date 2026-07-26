@@ -27,7 +27,6 @@ async function bootstrap() {
   app.enableShutdownHooks();
   const fastify = app.getHttpAdapter().getInstance();
 
-  // @ts-expect-error -- @fastify/cookie v11 type augmentation mismatch with NestJS FastifyAdapter
   await fastify.register(cookie, {
     secret: process.env.COOKIE_SECRET ?? 'tavi-local-dev-secret',
   });

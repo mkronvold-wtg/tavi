@@ -21,8 +21,8 @@ spec:
         fsGroup: 1000
       containers:
         - name: worker
-          image: ghcr.io/mkronvold/tavi-worker:latest
-          imagePullPolicy: Always
+          image: ghcr.io/mkronvold/tavi-worker:sha-fedc290@sha256:45e4b3bb42db3021b30fb6c2cb684b80f3b463c14418004cfd0c8fb68165a0d5
+          imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:
               type: RuntimeDefault

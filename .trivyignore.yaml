@@ -1,6 +1,61 @@
-# Approved Trivy exceptions. Every entry must include an ID, a risk statement,
-# and an expiration date so suppressions are reviewed and removed promptly.
-vulnerabilities: []
+# Approved Trivy exceptions. Every entry includes an owner in its statement and
+# an expiration date. Dependabot tracks the pinned base-image digest; remove
+# these entries as soon as an upstream fixed package is available.
+vulnerabilities:
+  - id: CVE-2023-45853
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream zlib1g fixed version; review the base-image digest."
+    expired_at: 2026-08-31
+  - id: CVE-2025-69720
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream ncurses fixed version; review the base-image digest."
+    expired_at: 2026-08-31
+  - id: CVE-2026-12151
+    statement: "Owner: platform. The fixed undici version is bundled in the required Prisma 7 migration CLI; remove after Prisma publishes the fix."
+    expired_at: 2026-08-31
+  - id: CVE-2026-13149
+    statement: "Owner: platform. The fixed brace-expansion version is bundled in the required Prisma 7 migration CLI; remove after Prisma publishes the fix."
+    expired_at: 2026-08-31
+  - id: CVE-2026-13221
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
+    expired_at: 2026-08-31
+  - id: CVE-2026-14257
+    statement: "Owner: platform. The fixed brace-expansion version is bundled in the required Prisma 7 migration CLI; remove after Prisma publishes the fix."
+    expired_at: 2026-08-31
+  - id: CVE-2026-41992
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream gzip fixed version; review the base-image digest."
+    expired_at: 2026-08-31
+  - id: CVE-2026-42496
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
+    expired_at: 2026-08-31
+  - id: CVE-2026-42497
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
+    expired_at: 2026-08-31
+  - id: CVE-2026-48962
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
+    expired_at: 2026-08-31
+  - id: CVE-2026-53615
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream util-linux fixed version; review the base-image digest."
+    expired_at: 2026-08-31
+  - id: CVE-2026-54369
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream libacl1 fixed version; review the base-image digest."
+    expired_at: 2026-08-31
+  - id: CVE-2026-57432
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
+    expired_at: 2026-08-31
+  - id: CVE-2026-57433
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
+    expired_at: 2026-08-31
+  - id: CVE-2026-59873
+    statement: "Owner: platform. The fixed tar version is bundled in the required Prisma 7 migration CLI; remove after Prisma publishes the fix."
+    expired_at: 2026-08-31
+  - id: CVE-2026-59874
+    statement: "Owner: platform. The fixed tar version is bundled in the required Prisma 7 migration CLI; remove after Prisma publishes the fix."
+    expired_at: 2026-08-31
+  - id: CVE-2026-8376
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
+    expired_at: 2026-08-31
+  - id: CVE-2026-9538
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
+    expired_at: 2026-08-31
 misconfigurations: []
 secrets: []
 licenses: []

@@ -1,15 +1,16 @@
 # Lifecycle Management
 
-Tavi uses two complementary lifecycle paths to keep container deployments current:
+Tavi deploys immutable container references. A deployment manifest always uses a
+human-readable tag together with a content digest, so the digest—not a mutable
+tag—selects the image that runs.
 
-1. Scheduled image refreshes rebuild the published GHCR app images with fresh base layers.
-2. Dependabot PRs update source-controlled dependencies such as pnpm packages, GitHub Actions, and Dockerfile base tags.
+See [`CI.md`](./CI.md) for validation, SBOM/provenance evidence, and Trivy
+scanning. See [`DOCKER.md`](./DOCKER.md) and
+[`KUBERNETES.md`](./KUBERNETES.md) for deployment procedures.
 
-These paths solve different problems. Image refreshes reduce exposure to CVEs fixed in upstream base layers without changing the repository. Dependabot PRs change tracked source files and should pass the normal review and validation flow.
+## Published images and promotion
 
-## Published app images
-
-Tavi publishes three app images:
+Tavi publishes three images:
 
 | Image                           | Dockerfile                       |
 | ------------------------------- | -------------------------------- |
@@ -17,81 +18,81 @@ Tavi publishes three app images:
 | `ghcr.io/mkronvold/tavi-web`    | `infra/docker/web.Dockerfile`    |
 | `ghcr.io/mkronvold/tavi-worker` | `infra/docker/worker.Dockerfile` |
 
-The normal publish workflow keeps the existing release behavior:
+The normal publish workflow builds every pull request without pushing. Pushes
+to `main` publish candidate `latest`, branch, and `sha-*` tags. A `v*` tag
+publishes release-tagged images and opens a release-pin pull request that:
 
-- PRs build images without pushing them.
-- `main` publishes `latest`, branch tags, and `sha-*` tags.
-- version tags publish tag and `sha-*` tags.
+1. Updates `infra/docker/compose-prod.images.env`.
+2. Updates API, web, and worker references in every supported raw Kubernetes
+   deployment variant.
+3. Uses `tag@sha256:digest` for each service image and
+   `imagePullPolicy: IfNotPresent`.
 
-The scheduled refresh workflow runs from the default branch, rebuilds the same three images with `pull: true` and `no-cache: true`, then publishes:
+Review and merge that pull request to promote the release. The workflow never
+changes deployment manifests directly. The checked-in initial pin uses the last
+available `sha-*` image because no version-tagged container image existed when
+immutable deployment references were introduced.
 
-- `latest`
-- `refresh-YYYYMMDD-HHMMSS`
+## Refreshes, base images, and dependencies
 
-It intentionally does not publish `sha-*` tags because a refresh is not tied to a new source commit.
+The scheduled refresh workflow runs weekly from the default branch. It
+validates, tests, rebuilds, scans, and attaches SBOM/provenance evidence to
+candidate `latest` and `refresh-*` images. Those tags are diagnostic and
+candidate artifacts only; they do not change a deployed environment.
 
-See [`CI.md`](./CI.md) for validation, container build, and vulnerability
-scanning behavior.
+Third-party references are pinned by digest in Dockerfiles, Compose, and raw
+Kubernetes manifests:
 
-## Dependency PR automation
+- Node 26 builder and slim runtime images
+- PostgreSQL 16 Alpine
+- Alpine backup post-processing examples
 
-Dependabot is configured for:
+Dependabot maintains pnpm/npm, GitHub Actions, Dockerfile, Compose, and raw
+Kubernetes image references. A merged digest-update PR intentionally changes a
+tracked input. The next versioned image release then promotes the resulting
+runtime through a release-pin PR.
 
-- pnpm/npm dependencies from the repository root
-- GitHub Actions workflow versions
-- Dockerfile base-image references under `infra/docker/`
+The CloudNativePG remote operator bundle remains a manual lifecycle item. Its
+upstream kustomization URL is not a container image reference and must be
+reviewed with the operator's upgrade documentation.
 
-Patch and minor Dependabot updates are eligible for auto-approval and auto-merge after required checks pass. Major updates remain manual because they can include breaking changes or runtime behavior changes.
+## Compose rollout and rollback
 
-Suggested manual review prompt for major dependency PRs:
-
-```text
-Review this dependency update for Tavi. Focus on breaking changes, runtime or build changes, security implications, migration notes, and whether the Docker/Kubernetes deployment docs need updates.
-```
-
-## Docker Compose image refresh consumption
-
-The published-image compose stack in `infra/docker/compose-prod.yaml` uses `TAVI_TAG`, defaulting to `latest`.
-
-To consume a refreshed `latest` image:
+Always use the checked-in immutable release file plus a local runtime/secrets
+file:
 
 ```bash
 docker compose \
+  --env-file infra/docker/compose-prod.images.env \
   --env-file infra/docker/compose-prod.env \
   -f infra/docker/compose-prod.yaml \
   pull
 
 docker compose \
+  --env-file infra/docker/compose-prod.images.env \
   --env-file infra/docker/compose-prod.env \
   -f infra/docker/compose-prod.yaml \
   up -d
 ```
 
-To pin a specific refresh build, set `TAVI_TAG=refresh-YYYYMMDD-HHMMSS` in the compose env file and run the same pull and up commands.
+To roll back, revert the release-pin commit or restore the previous three
+references in `compose-prod.images.env`, then run the same `pull` and `up -d`
+commands. Do not substitute `latest` or a refresh tag for a reviewed release
+pin.
 
-## Kubernetes image refresh consumption
+## Kubernetes rollout and rollback
 
-The raw Kubernetes manifests use `:latest` for Tavi app images and set Tavi app containers to `imagePullPolicy: Always`. That keeps rollouts compatible with weekly `latest` refreshes.
-
-After a scheduled refresh publishes new images, replace running pods with:
+Merge the release-pin pull request, apply the chosen manifest variant, and
+watch the rollout:
 
 ```bash
-kubectl rollout restart deployment/tavi-api -n tavi
-kubectl rollout restart deployment/tavi-web -n tavi
-kubectl rollout restart deployment/tavi-worker -n tavi
+kubectl apply -k infra/k8s/k8s-with-external-db
 kubectl rollout status deployment/tavi-api -n tavi
 kubectl rollout status deployment/tavi-web -n tavi
 kubectl rollout status deployment/tavi-worker -n tavi
 ```
 
-If you pin manifests to a timestamped `refresh-*` tag or a release tag, update the selected variant's manifests first, then apply them and watch the rollout.
-
-## Manual lifecycle items
-
-Some deployment pins are intentionally documented for manual review in this first lifecycle pass:
-
-- `postgres:16-alpine` in Docker Compose and the single-node internal PostgreSQL Kubernetes variant
-- `alpine:3.22` in backup post-processing CronJob examples
-- the pinned CloudNativePG operator bundle URL under `infra/k8s/k8s-with-replicas-and-internal-ha-db/cloudnative-pg-install/`
-
-Review these periodically when planning database or cluster-operator maintenance. They are outside the first Dependabot automation scope because raw Kubernetes manifest pins and remote kustomize URLs are not as cleanly handled as pnpm, GitHub Actions, and Dockerfile dependencies.
+Use the matching path for the selected deployment variant. To roll back,
+revert the release-pin commit, reapply that variant, and watch the same rollout
+statuses. An immutable digest makes the selected rollback artifact explicit and
+reproducible.

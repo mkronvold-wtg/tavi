@@ -10,7 +10,6 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "node ./scripts/serve-dist.mjs",
-    "start:preview": "vite preview --host 0.0.0.0 --port 4173",
     "test": "vitest run",
     "typecheck": "tsc -b --pretty false"
   },
