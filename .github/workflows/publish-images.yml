@@ -237,7 +237,7 @@ jobs:
             --worker "ghcr.io/$GHCR_OWNER/tavi-worker:$RELEASE_TAG@$worker_digest"
 
       - name: Create release-pin pull request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: automation/release-pins-${{ github.ref_name }}
           commit-message: "chore(release): pin ${{ github.ref_name }} image digests"
