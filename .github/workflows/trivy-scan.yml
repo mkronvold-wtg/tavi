@@ -1,22 +1,8 @@
 name: Scan container images
 
 on:
+  # This workflow's job names are required by main branch protection.
   pull_request:
-    paths:
-      - ".dockerignore"
-      - ".trivyignore.yaml"
-      - ".github/workflows/publish-images.yml"
-      - ".github/workflows/refresh-images.yml"
-      - ".github/workflows/trivy-scan.yml"
-      - "apps/**"
-      - "packages/**"
-      - "infra/docker/**"
-      - "package.json"
-      - ".node-version"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "turbo.json"
-      - "tsconfig.base.json"
   push:
     branches:
       - main

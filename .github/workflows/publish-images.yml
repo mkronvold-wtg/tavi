@@ -1,23 +1,8 @@
 name: Publish container images
 
 on:
+  # This workflow's job names are required by main branch protection.
   pull_request:
-    paths:
-      - ".dockerignore"
-      - ".github/dependabot.yml"
-      - ".github/workflows/automerge-dependencies.yml"
-      - ".github/workflows/publish-images.yml"
-      - ".github/workflows/refresh-images.yml"
-      - "apps/**"
-      - "packages/**"
-      - "infra/docker/**"
-      - "scripts/update-release-pins.mjs"
-      - "package.json"
-      - ".node-version"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "turbo.json"
-      - "tsconfig.base.json"
   push:
     branches:
       - main
