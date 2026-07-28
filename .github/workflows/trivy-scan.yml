@@ -63,23 +63,34 @@ jobs:
             --tag "tavi-${{ matrix.service }}:${{ github.sha }}" \
             .
 
-      - name: Scan image with Trivy
+      - name: Report image vulnerabilities
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: tavi-${{ matrix.service }}:${{ github.sha }}
           format: sarif
           output: trivy-${{ matrix.service }}.sarif
-          severity: HIGH,CRITICAL
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
           limit-severities-for-sarif: "true"
           scanners: vuln
           trivyignores: .trivyignore.yaml
-          exit-code: "1"
+          exit-code: "0"
 
       - name: Upload scan results
+        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.service)) != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-${{ matrix.service }}.sarif
           category: trivy-${{ matrix.service }}
+
+      - name: Enforce high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: tavi-${{ matrix.service }}:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          scanners: vuln
+          trivyignores: .trivyignore.yaml
+          exit-code: "1"
 
   scan-refreshed-images:
     name: Scan refreshed ${{ matrix.service }} image
@@ -111,20 +122,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Scan refreshed image with Trivy
+      - name: Report refreshed image vulnerabilities
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/tavi-${{ matrix.service }}:latest
           format: sarif
           output: trivy-${{ matrix.service }}.sarif
-          severity: HIGH,CRITICAL
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
           limit-severities-for-sarif: "true"
           scanners: vuln
           trivyignores: .trivyignore.yaml
-          exit-code: "1"
+          exit-code: "0"
 
       - name: Upload scan results
+        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.service)) != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-${{ matrix.service }}.sarif
           category: trivy-${{ matrix.service }}
+
+      - name: Enforce high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/tavi-${{ matrix.service }}:latest
+          format: table
+          severity: HIGH,CRITICAL
+          scanners: vuln
+          trivyignores: .trivyignore.yaml
+          exit-code: "1"
