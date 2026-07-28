@@ -92,6 +92,34 @@ jobs:
           trivyignores: .trivyignore.yaml
           exit-code: "1"
 
+  scan-filesystem:
+    name: Scan repository configuration
+    if: github.event_name != 'workflow_run'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Report filesystem misconfigurations and secrets
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-filesystem.sarif
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          limit-severities-for-sarif: "true"
+          scanners: misconfig,secret
+          trivyignores: .trivyignore.yaml
+          exit-code: "0"
+
+      - name: Upload filesystem scan results
+        if: always() && hashFiles('trivy-filesystem.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-filesystem.sarif
+          category: trivy-filesystem
+
   scan-refreshed-images:
     name: Scan refreshed ${{ matrix.service }} image
     if: >-
