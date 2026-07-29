@@ -22,7 +22,11 @@ RUN pnpm --filter @tavi/config build \
   && pnpm --filter @tavi/schemas build \
   && pnpm --filter @tavi/api prisma:generate \
   && pnpm --filter @tavi/api build \
-  && pnpm --filter @tavi/api deploy --legacy --prod /opt/tavi/api
+  && pnpm --filter @tavi/api deploy --legacy --prod /opt/tavi/api \
+  && cd /opt/tavi/api \
+  && ./node_modules/.bin/prisma generate \
+  && test -f node_modules/.prisma/client/default.js \
+    -o -n "$(find node_modules -type f -path '*/.prisma/client/default.js' | head -n 1)"
 
 FROM node:26-bookworm-slim@sha256:2d49d876e96237d76de412761cf05dbfe5aee325cc4406a4d41d5824c5bb8beb AS runtime
 

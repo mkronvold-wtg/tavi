@@ -1,7 +1,71 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
-cd "${script_dir}"
-docker compose --env-file compose-prod.env -f compose-prod.yaml up -d
+readonly env_example_file="compose-prod.env.example"
+readonly env_file="compose-prod.env"
+readonly images_file="compose-prod.images.env"
+readonly compose_file="compose-prod.yaml"
+
+timestamp() {
+  date '+%Y-%m-%d %H:%M:%S'
+}
+
+log() {
+  printf '[%s] %s\n' "$(timestamp)" "$*"
+}
+
+log_error() {
+  printf '[%s] %s\n' "$(timestamp)" "$*" >&2
+}
+
+require_docker() {
+  if ! command -v docker >/dev/null 2>&1; then
+    log_error 'docker is required to start the deployment stack.'
+    exit 1
+  fi
+}
+
+ensure_env_file() {
+  if [[ -f "$env_file" ]]; then
+    return
+  fi
+
+  if [[ ! -f "$env_example_file" ]]; then
+    log_error "Missing ${env_file}. Copy ${env_example_file} and set secrets first."
+    exit 1
+  fi
+
+  cp -- "$env_example_file" "$env_file"
+  log "Created ${env_file} from ${env_example_file}."
+}
+
+compose_cmd() {
+  local -a compose_args=()
+
+  if [[ -f "$images_file" ]]; then
+    compose_args+=(--env-file "$images_file")
+  fi
+
+  compose_args+=(--env-file "$env_file" -f "$compose_file")
+  docker compose "${compose_args[@]}" "$@"
+}
+
+require_docker
+ensure_env_file
+
+if [[ -f "$images_file" ]]; then
+  log "Using image pins from ${images_file}."
+else
+  log "No ${images_file}; using image references from ${compose_file} / ${env_file}."
+fi
+
+log 'Pulling deployment images...'
+compose_cmd pull
+
+log 'Starting deployment stack...'
+compose_cmd up -d --remove-orphans "$@"
+
+log 'Containers up'
