@@ -61,9 +61,9 @@ Node server.
 
 GitHub Actions publishes the production image set from `infra/docker` to GHCR:
 
-- `ghcr.io/mkronvold/tavi-api`
-- `ghcr.io/mkronvold/tavi-web`
-- `ghcr.io/mkronvold/tavi-worker`
+- `ghcr.io/mkronvold-wtg/tavi-api`
+- `ghcr.io/mkronvold-wtg/tavi-web`
+- `ghcr.io/mkronvold-wtg/tavi-worker`
 
 The `publish-images.yml` workflow builds all three images on pull requests,
 then pushes branch, tag, and `sha-*` tags on `main`, version tags, or manual

@@ -16,9 +16,9 @@ Tavi now ships four complete raw-manifest deployment paths under `infra/k8s/`. P
 1. A Kubernetes cluster with a compatible ingress controller using `ingressClassName: contour` by default.
 2. `kubectl` access with permission to create resources in the `tavi` namespace. The HA internal-database path also needs permission to create cluster-scoped CloudNativePG resources and resources in `cnpg-system`.
 3. Access to:
-   - `ghcr.io/mkronvold/tavi-api`
-   - `ghcr.io/mkronvold/tavi-web`
-   - `ghcr.io/mkronvold/tavi-worker`
+   - `ghcr.io/mkronvold-wtg/tavi-api`
+   - `ghcr.io/mkronvold-wtg/tavi-web`
+   - `ghcr.io/mkronvold-wtg/tavi-worker`
 4. A strong `COOKIE_SECRET`.
 
 Additional variant-specific requirements:

@@ -21,7 +21,7 @@ spec:
         fsGroup: 1000
       initContainers:
         - name: migrate
-          image: ghcr.io/mkronvold/tavi-api:sha-fedc290@sha256:ebd6602d9440f400be6bfdaa7301afd16958c35fcf749bc739863839fbe996ed
+          image: ghcr.io/mkronvold-wtg/tavi-api:sha-69b0417@sha256:05e049f92154a992e2f033a9967419e5a6611b6983b1f51ae44dad82c61dc376
           imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:
@@ -67,7 +67,7 @@ spec:
                   key: COOKIE_SECRET
       containers:
         - name: api
-          image: ghcr.io/mkronvold/tavi-api:sha-fedc290@sha256:ebd6602d9440f400be6bfdaa7301afd16958c35fcf749bc739863839fbe996ed
+          image: ghcr.io/mkronvold-wtg/tavi-api:sha-69b0417@sha256:05e049f92154a992e2f033a9967419e5a6611b6983b1f51ae44dad82c61dc376
           imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:

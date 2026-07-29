@@ -15,7 +15,7 @@ want a no-build runtime that pulls the published images instead, use
 ## Start the stack
 
 ```bash
-git clone https://github.com/mkronvold/tavi
+git clone https://github.com/mkronvold-wtg/tavi
 cd tavi
 ./scripts/dev-up
 ```

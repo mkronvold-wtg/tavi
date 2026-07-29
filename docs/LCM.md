@@ -14,9 +14,9 @@ Tavi publishes three images:
 
 | Image                           | Dockerfile                       |
 | ------------------------------- | -------------------------------- |
-| `ghcr.io/mkronvold/tavi-api`    | `infra/docker/api.Dockerfile`    |
-| `ghcr.io/mkronvold/tavi-web`    | `infra/docker/web.Dockerfile`    |
-| `ghcr.io/mkronvold/tavi-worker` | `infra/docker/worker.Dockerfile` |
+| `ghcr.io/mkronvold-wtg/tavi-api`    | `infra/docker/api.Dockerfile`    |
+| `ghcr.io/mkronvold-wtg/tavi-web`    | `infra/docker/web.Dockerfile`    |
+| `ghcr.io/mkronvold-wtg/tavi-worker` | `infra/docker/worker.Dockerfile` |
 
 The normal publish workflow builds every pull request without pushing. Pushes
 to `main` publish candidate `latest`, branch, and `sha-*` tags. A `v*` tag
