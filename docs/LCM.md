@@ -80,6 +80,54 @@ references in `compose-prod.images.env`, then run the same `pull` and `up -d`
 commands. Do not substitute `latest` or a refresh tag for a reviewed release
 pin.
 
+Helper scripts in `infra/docker/`:
+
+- `up.sh` — pull images and start the stack (runs the Compose `migrate` service)
+- `down.sh` — stop the stack
+- `autoupdate.sh` — GHCR digest watcher for the mutable Docker-host channel
+
+```bash
+cd infra/docker
+./up.sh
+./down.sh
+./autoupdate.sh --once
+./autoupdate.sh 30
+```
+
+## Home Docker-host auto-refresh channel
+
+Trusted self-hosted Compose instances may track a mutable app tag such as
+`latest` and refresh automatically. This channel is separate from the immutable
+release/Kubernetes pins above.
+
+Requirements:
+
+1. App services use GHCR images (`api`, `web`, `worker`).
+2. Postgres and proxies are excluded from auto-refresh.
+3. `autoupdate.sh` compares local image digests to remote GHCR manifests before
+   pulling.
+4. On change, it restarts only through `./up.sh` so migrations stay aligned with
+   manual startup.
+5. Prefer `./autoupdate.sh --once` under cron or a systemd timer (about every 30
+   minutes), with a lock file so cycles cannot overlap.
+6. One timer/log/lock per stack instance when multiple Tavi stacks share a host.
+
+Example cron entries:
+
+```cron
+*/30 * * * * cd /path/to/tavi-damocles && /bin/bash ./autoupdate.sh --once >> ./autoupdate.log 2>&1
+*/30 * * * * cd /path/to/tavi-kronvold && /bin/bash ./autoupdate.sh --once >> ./autoupdate.log 2>&1
+```
+
+Do not enable host auto-refresh until the tracked mutable tag has been smoke-tested
+(`api`/`worker` can import `@prisma/client`, migrate exits 0, and healthchecks pass).
+If a bad candidate is published, pin the host stack to a known-good local or GHCR
+tag/digest, set `TAVI_TAG` accordingly, and rerun `./up.sh`.
+
+Rollback on an auto-refresh host means pointing the stack at a known-good tag or
+digest and running `./up.sh`, not editing a running container. Do not use
+Watchtower unless an explicit exception is approved.
+
 ## Kubernetes rollout and rollback
 
 Merge the release-pin pull request, apply the chosen manifest variant, and

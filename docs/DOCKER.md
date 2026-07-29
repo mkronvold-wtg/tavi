@@ -47,9 +47,11 @@ docker compose \
 ```
 
 The one-shot `migrate` service runs the Prisma migration CLI shipped in the
-minimal API runtime before API and worker start. The web image serves static
-assets through its built-in Node server and generates `runtime-config.js` when
-the container starts.
+minimal API runtime before API and worker start. The API and worker images are
+built with `pnpm deploy` and must regenerate or copy the Prisma client into the
+deployed package after deploy—`@prisma/client` alone is not enough at runtime.
+The web image serves static assets through its built-in Node server and generates
+`runtime-config.js` when the container starts.
 
 Follow the API logs to capture the generated initial admin password for an
 empty local-auth database:
@@ -107,16 +109,35 @@ docker run --rm \
   ./node_modules/.bin/prisma migrate deploy
 ```
 
+## Helper scripts
+
+From `infra/docker/` after creating `compose-prod.env`:
+
+```bash
+./up.sh
+./down.sh
+./autoupdate.sh --once
+```
+
+`up.sh` and `down.sh` use `compose-prod.images.env` when present (immutable pin
+channel). Without that file they honor image references from Compose/`compose-prod.env`
+(mutable home Docker-host channel).
+
+`autoupdate.sh` watches GHCR digests for `api`, `web`, and `worker`, pulls only
+when they change, and restarts through `./up.sh`. Prefer `--once` under cron or a
+systemd timer. See [`LCM.md`](./LCM.md) for the auto-refresh channel rules.
+
 ## Release and rollback
 
 Promote a new version by reviewing and merging its generated release-pin pull
 request, then running the Compose `pull` and `up -d` commands above. Candidate
-`latest` and `refresh-*` images are not deployment inputs.
+`latest` and `refresh-*` images are not deployment inputs for the immutable
+channel.
 
-To roll back, restore the three references in
+To roll back an immutable deploy, restore the three references in
 `infra/docker/compose-prod.images.env` from the previous release-pin commit
 and run the same commands. See [`LCM.md`](./LCM.md) for the full promotion,
-refresh, and rollback policy.
+refresh, auto-refresh, and rollback policy.
 
 ## Open the app
 

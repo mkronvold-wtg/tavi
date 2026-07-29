@@ -26,7 +26,15 @@ RUN pnpm --filter @tavi/config build \
   && pnpm --filter @tavi/schemas build \
   && pnpm --filter @tavi/api prisma:generate \
   && pnpm --filter @tavi/worker build \
-  && pnpm --filter @tavi/worker deploy --legacy --prod /opt/tavi/worker
+  && pnpm --filter @tavi/worker deploy --legacy --prod /opt/tavi/worker \
+  && GENERATED="$(find /app/node_modules -type f -path '*/.prisma/client/default.js' | head -n 1)" \
+  && test -n "$GENERATED" \
+  && CLIENT_PKG="$(readlink -f /opt/tavi/worker/node_modules/@prisma/client)" \
+  && DEST_NM="$(dirname "$(dirname "$CLIENT_PKG")")" \
+  && mkdir -p "$DEST_NM/.prisma" \
+  && rm -rf "$DEST_NM/.prisma/client" \
+  && cp -a "$(dirname "$GENERATED")" "$DEST_NM/.prisma/client" \
+  && test -f "$DEST_NM/.prisma/client/default.js"
 
 FROM node:26-bookworm-slim@sha256:2d49d876e96237d76de412761cf05dbfe5aee325cc4406a4d41d5824c5bb8beb AS runtime
 
