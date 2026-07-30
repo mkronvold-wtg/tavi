@@ -1,0 +1,42 @@
+name: One-time Artifactory push pull
+
+on:
+  push:
+    branches:
+      - mkronvold-wtg-migrating-tavi-repository
+    paths:
+      - .github/workflows/one-time-artifactory-push-pull.yml
+
+permissions: {}
+
+jobs:
+  verify-artifactory:
+    name: Verify Artifactory push and pull
+    runs-on:
+      - self-hosted
+      - docker-wtg
+    timeout-minutes: 5
+    env:
+      IMAGE: sv4.art.e2open.com/dcops-docker-repo/tavi-artifactory-access-probe
+      TAG: gha-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Push and pull probe image
+        id: probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="${IMAGE}:${TAG}"
+          local_image="tavi-artifactory-access-probe:${TAG}"
+          temporary_directory="$(mktemp -d)"
+          trap 'rm -rf "$temporary_directory"; docker image rm -f "$target" "$local_image" >/dev/null 2>&1 || true' EXIT
+
+          printf 'Tavi Artifactory access probe\n' > "${temporary_directory}/probe.txt"
+          tar -C "$temporary_directory" -cf - probe.txt | docker import - "$local_image"
+          docker tag "$local_image" "$target"
+          docker push "$target"
+
+          docker image rm "$target"
+          docker pull "$target"
+          digest="$(docker image inspect "$target" --format '{{index .RepoDigests 0}}')"
+          test -n "$digest"
+          echo "Verified immutable manifest: $digest"
