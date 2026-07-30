@@ -193,6 +193,97 @@ jobs:
           path: ${{ matrix.service }}.digest
           retention-days: 180
 
+  build-and-publish-internal:
+    name: Publish internal ${{ matrix.service }} image
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on:
+      - self-hosted
+      - docker-wtg
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - service: api
+            image: tavi-api
+            dockerfile: infra/docker/api.Dockerfile
+          - service: web
+            image: tavi-web
+            dockerfile: infra/docker/web.Dockerfile
+          - service: worker
+            image: tavi-worker
+            dockerfile: infra/docker/worker.Dockerfile
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Verify Artifactory credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          config="$HOME/.docker/config.json"
+          test -r "$config"
+          auth="$(
+            jq -r \
+              --arg registry 'sv4.art.e2open.com' \
+              '(.auths // {})[$registry].auth // empty' \
+              "$config"
+          )"
+          test -n "$auth"
+
+      - name: Set build metadata
+        id: build-metadata
+        run: echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: sv4.art.e2open.com/dcops-docker-repo/${{ matrix.image }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,prefix=sha-
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=${{ matrix.image }}
+
+      - name: Build and publish internal image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          pull: true
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            TAVI_BUILD_SHA=${{ github.sha }}
+            TAVI_BUILD_DATE=${{ steps.build-metadata.outputs.date }}
+          cache-from: type=gha,scope=internal-${{ matrix.image }}
+          cache-to: type=gha,scope=internal-${{ matrix.image }},mode=max,ignore-error=true
+          provenance: mode=max
+          sbom: true
+
+      - name: Save internal image digest
+        run: printf '%s\n' '${{ steps.build.outputs.digest }}' > internal-${{ matrix.service }}.digest
+
+      - name: Upload internal image digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: internal-image-digest-${{ matrix.service }}
+          path: internal-${{ matrix.service }}.digest
+          retention-days: 180
+
   create-release-pin-pull-request:
     name: Create immutable release-pin pull request
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')

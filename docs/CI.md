@@ -11,9 +11,9 @@ See [`LCM.md`](./LCM.md) for promotion and rollback, and
 
 | Workflow                        | When it runs                                               | What it does                                                                                                                                      |
 | ------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Validates and tests the workspace, builds API/web/worker images, and publishes immutable evidence outside PRs. A `v*` tag opens a release-pin PR. |
+| `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Validates and tests the workspace, builds API/web/worker images, publishes public GHCR images outside PRs, and publishes internal Artifactory images from the trusted `docker-wtg` runner. A `v*` tag opens a release-pin PR. |
 | `Scan container images`         | Every PR, `main`, manual dispatch, or a successful refresh | Runs Trivy for API, web, and worker images and uploads High/Critical SARIF findings to GitHub code scanning.                                      |
-| `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans candidate `latest` and timestamped refresh images. It does not deploy them.                     |
+| `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans public candidate images; it also refreshes the internal Artifactory images from `docker-wtg`. It does not deploy them.                     |
 | `Auto-merge dependency updates` | Dependabot PR events                                       | Approves supported patch/minor npm, GitHub Actions, and Docker updates after required checks succeed. Major updates remain manual.                |
 
 ## Validation
@@ -32,12 +32,31 @@ images without publishing because these job names are required checks on
 `main`. Run the same root commands locally with Node 26 before opening a
 change.
 
+## Internal Artifactory publication
+
+Trusted non-pull-request runs build API, web, and worker images again on the
+repository-scoped `docker-wtg` self-hosted runner. Those images are published
+to `sv4.art.e2open.com/dcops-docker-repo/tavi-{api,web,worker}` with the same
+`latest`, ref, and SHA tag policy as public images. The runner's host-local
+Docker configuration supplies the Artifactory credential; no registry
+credential is stored in the workflow.
+
+The internal matrix is serialized because Tavi currently has one matching
+runner. It must never run for a pull request. GitHub-hosted runners continue
+to build and publish public GHCR images, while Kubernetes development
+deployments consume the same Artifactory service through
+`repo.ops.e2open.com`.
+
+This lane establishes internal publication only. BSI base-image selection and
+Xray policy enforcement remain separate migration work.
+
 ## Image evidence and version promotion
 
-Every published image receives BuildKit SBOM and provenance attestations. The
-workflow also generates a CycloneDX SBOM and a High/Critical Trivy report from
-the exact remote digest for each service, retaining them as workflow artifacts
-for 180 days alongside the published digest.
+Every published image receives BuildKit SBOM and provenance attestations.
+Public GHCR publication also generates a CycloneDX SBOM and a High/Critical
+Trivy report from the exact remote digest for each service, retaining them as
+workflow artifacts for 180 days alongside the published digest. Internal
+Artifactory publication retains its immutable digest as a workflow artifact.
 
 For a `v*` tag, the workflow downloads those three digest records and uses
 [`scripts/update-release-pins.mjs`](../scripts/update-release-pins.mjs) to
