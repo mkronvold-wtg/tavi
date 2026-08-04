@@ -24,3 +24,15 @@ This directory now contains only the supported raw-manifest deployment variants 
 2. The `k8s-with-replicas-and-internal-ha-db/` variant also includes `cloudnative-pg-install/`, a pinned CloudNativePG operator + CRD kustomization used before the HA database cluster is applied.
 3. The old top-level manifests were removed because they were a legacy pre-variant set and no longer matched the backup-aware deployment layouts in the supported folders.
 4. When you need `TAVI_HOME_URL`, `VITE_API_BASE_URL`, ingress hostnames, or backup PVC settings, edit the files in the chosen variant directory rather than expecting shared manifests at this level.
+
+## Development deployment helper defaults
+
+`tavi-dev.defaults.env` supplies the default `K8S_NAMESPACE` and `K8S_CLUSTER`
+used by the external `tavi-dev/update.sh` helper. The helper reads this file
+after updating its Tavi source checkout; caller-provided environment values take
+precedence. These Kubernetes client settings do not belong in Dockerfiles or
+Docker Compose because containers do not use them.
+
+The helper supports `--prepare-only` to validate generated manifests,
+`--write-only` to write them without a Kubernetes operation, and `--apply-only`
+to validate and apply the manifests already written to `tavi-dev`.
