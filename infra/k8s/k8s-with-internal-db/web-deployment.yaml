@@ -13,6 +13,8 @@ spec:
       labels:
         app: tavi-web
     spec:
+      imagePullSecrets:
+        - name: regcred
       containers:
         - name: web
           image: ghcr.io/mkronvold/tavi-web:sha-fedc290@sha256:c9973baf99a30dc609519621d3ed17c563bb6eceece3a19de25401cd8b825593

@@ -65,6 +65,8 @@ spec:
                 secretKeyRef:
                   name: tavi-secrets
                   key: COOKIE_SECRET
+      imagePullSecrets:
+        - name: regcred
       containers:
         - name: api
           image: ghcr.io/mkronvold/tavi-api:sha-fedc290@sha256:ebd6602d9440f400be6bfdaa7301afd16958c35fcf749bc739863839fbe996ed
