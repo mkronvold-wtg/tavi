@@ -1,0 +1,10 @@
+{
+  "goal_id": "remediate-pr-55",
+  "status": "building",
+  "iteration": 1,
+  "builder_model": "Claude:Sonnet-4.6",
+  "inspector_model": "Claude:Haiku-4.5",
+  "initial_sha": "cedba892a593688fe93d474696f88a1ccb261041",
+  "created_at": "2026-08-05T15:58:01-05:00",
+  "history": []
+}
