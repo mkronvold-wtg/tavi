@@ -33,6 +33,9 @@ FROM node:26-bookworm-slim@sha256:81502e860176e63695d769d3d1a2d3a403abc1c27c6a02
 WORKDIR /app
 ENV NODE_ENV=production
 
+# The runtime executes Node directly; remove the unused npm CLI and its vulnerable transitive packages.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 COPY --from=builder --chown=node:node /opt/tavi/api ./
 
 USER node
