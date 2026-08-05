@@ -1,7 +1,7 @@
 export const appName = "tavi";
 export { appVersion } from "./app-version.js";
 export { buildEmailHtml, escapeHtml, parseSmtpUrl } from "./email.js";
-export const appRepositoryUrl = "https://github.com/mkronvold/tavi";
+export const appRepositoryUrl = "https://github.com/mkronvold-wtg/tavi";
 
 export const defaultPorts = {
   api: 4000,

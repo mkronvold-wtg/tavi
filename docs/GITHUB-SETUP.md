@@ -57,8 +57,8 @@ version updates from `.github/dependabot.yml`.
 
 If the repository or packages are private, deployment hosts need permission to pull:
 
-- `ghcr.io/mkronvold/tavi-api`
-- `ghcr.io/mkronvold/tavi-web`
-- `ghcr.io/mkronvold/tavi-worker`
+- `ghcr.io/mkronvold-wtg/tavi-api`
+- `ghcr.io/mkronvold-wtg/tavi-web`
+- `ghcr.io/mkronvold-wtg/tavi-worker`
 
 Use `docker login ghcr.io` for Docker hosts or an image pull secret for Kubernetes clusters.

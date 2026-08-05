@@ -21,7 +21,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: worker
-          image: ghcr.io/mkronvold/tavi-worker:sha-fedc290@sha256:45e4b3bb42db3021b30fb6c2cb684b80f3b463c14418004cfd0c8fb68165a0d5
+          image: ghcr.io/mkronvold-wtg/tavi-worker:sha-69b0417@sha256:ee700eda62e8bacd79d0c225d463788e94064fc3275de983aededbe828deabf4
           imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:
