@@ -12,6 +12,7 @@
       "find-my-way": "9.7.0",
       "fast-uri@3.1.4": "3.1.5",
       "fast-uri@4.1.1": "4.1.2",
+      "@nestjs/platform-fastify>fastify": "5.11.0",
       "tar@7.5.16": "7.5.19",
       "undici@6.26.0": "6.27.0"
     }
@@ -27,7 +28,7 @@
   },
   "devDependencies": {
     "prettier": "^3.9.6",
-    "turbo": "^2.10.7",
+    "turbo": "^2.10.8",
     "typescript": "^5.9.3"
   }
 }
