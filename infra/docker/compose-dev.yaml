@@ -18,7 +18,7 @@ services:
 
   api:
     container_name: tavi-api
-    image: node:26-bookworm@sha256:219fc9da91e7f29a9f32290ff598cdf8886fd68f421ff515c8f93434da39a271
+    image: node:26-bookworm@sha256:70b4206f32b0aaa37f4d018475ec0f4f3a9624aa4ceb06d8377718de843452dc
     working_dir: /workspace
     command: >
       bash -lc "
@@ -67,7 +67,7 @@ services:
 
   web:
     container_name: tavi-web
-    image: node:26-bookworm@sha256:219fc9da91e7f29a9f32290ff598cdf8886fd68f421ff515c8f93434da39a271
+    image: node:26-bookworm@sha256:70b4206f32b0aaa37f4d018475ec0f4f3a9624aa4ceb06d8377718de843452dc
     working_dir: /workspace
     command: >
       bash -lc "
@@ -94,7 +94,7 @@ services:
 
   worker:
     container_name: tavi-worker
-    image: node:26-bookworm@sha256:219fc9da91e7f29a9f32290ff598cdf8886fd68f421ff515c8f93434da39a271
+    image: node:26-bookworm@sha256:70b4206f32b0aaa37f4d018475ec0f4f3a9624aa4ceb06d8377718de843452dc
     working_dir: /workspace
     command: >
       bash -lc "
