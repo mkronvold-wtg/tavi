@@ -15,11 +15,12 @@ Tavi now ships four complete raw-manifest deployment paths under `infra/k8s/`. P
 
 1. A Kubernetes cluster with a compatible ingress controller using `ingressClassName: contour` by default.
 2. `kubectl` access with permission to create resources in the `tavi` namespace. The HA internal-database path also needs permission to create cluster-scoped CloudNativePG resources and resources in `cnpg-system`.
-3. Access to:
+3. A namespace-local `regcred` image-pull secret that authenticates the registry hosting the Tavi images. Do not commit its credentials; create it before applying app workloads.
+4. Access to:
    - `ghcr.io/mkronvold-wtg/tavi-api`
    - `ghcr.io/mkronvold-wtg/tavi-web`
    - `ghcr.io/mkronvold-wtg/tavi-worker`
-4. A strong `COOKIE_SECRET`.
+5. A strong `COOKIE_SECRET`.
 
 Additional variant-specific requirements:
 
@@ -40,10 +41,11 @@ Each variant README follows the same pattern:
 
 1. Edit `configmap.yaml` and `ingress.yaml` in the chosen folder for your hostname and public URLs.
 2. Create real secrets from that folder's `secret.example.yaml`.
-3. Review that folder's `backup-pvc.yaml`. The API and worker share the backup volume, so the storage class must support `ReadWriteMany`.
-4. Internal DB variants also ship an optional `postgres-network-policy.example.yaml` you can customize and apply if your cluster uses NetworkPolicy to limit Postgres access to the API and worker pods.
-5. Apply the manifests from that folder only.
-6. Verify the rollout for the app deployments and, if present, the database workload.
+3. Create `regcred` in the target namespace with credentials for the selected image registry.
+4. Review that folder's `backup-pvc.yaml`. The API and worker share the backup volume, so the storage class must support `ReadWriteMany`.
+5. Internal DB variants also ship an optional `postgres-network-policy.example.yaml` you can customize and apply if your cluster uses NetworkPolicy to limit Postgres access to the API and worker pods.
+6. Apply the manifests from that folder only.
+7. Verify the rollout for the app deployments and, if present, the database workload.
 
 ## Installing CloudNativePG for the HA variant
 
