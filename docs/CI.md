@@ -9,12 +9,12 @@ See [`LCM.md`](./LCM.md) for promotion and rollback, and
 
 ## Workflows
 
-| Workflow                        | When it runs                                               | What it does                                                                                                                                      |
-| ------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Validates and tests the workspace, builds API/web/worker images, and publishes immutable evidence outside PRs. A `v*` tag opens a release-pin PR. |
-| `Scan container images`         | Every PR, `main`, manual dispatch, or a successful refresh | Runs Trivy for API, web, and worker images and uploads High/Critical SARIF findings to GitHub code scanning.                                      |
-| `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans candidate `latest` and timestamped refresh images. It does not deploy them.                     |
-| `Auto-merge dependency updates` | Dependabot PR events                                       | Approves supported patch/minor npm, GitHub Actions, and Docker updates after required checks succeed. Major updates remain manual.                |
+| Workflow                        | When it runs                                               | What it does                                                                                                                                                                      |
+| ------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Detects container-relevant PR changes; validates and builds API/web/worker images only when needed, publishing immutable evidence outside PRs. A `v*` tag opens a release-pin PR. |
+| `Scan container images`         | Every PR, `main`, manual dispatch, or a successful refresh | Detects container-relevant PR changes; scans applicable API, web, and worker images with Trivy and uploads High/Critical SARIF findings to GitHub code scanning.                  |
+| `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans candidate `latest` and timestamped refresh images. It does not deploy them.                                                     |
+| `Auto-merge dependency updates` | Dependabot PR events                                       | Approves supported patch/minor npm, GitHub Actions, and Docker updates after required checks succeed. Major updates remain manual.                                                |
 
 ## Validation
 
@@ -27,10 +27,14 @@ The publish and refresh workflows run:
 5. `corepack pnpm typecheck`
 6. `corepack pnpm test`
 
-Image builds are independent per service. Every pull request builds candidate
-images without publishing because these job names are required checks on
-`main`. Run the same root commands locally with Node 26 before opening a
-change.
+Image builds are independent per service. Every pull request creates the
+required workspace, image-build, and image-scan check runs. Pull requests that
+do not modify container-relevant inputs skip those jobs successfully; changes
+to application code, packages, container definitions, dependency metadata, or
+the relevant workflows run the full candidate-image validation without
+publishing. If change detection fails, the workflows run the full validation
+instead of skipping it. Run the same root commands locally with Node 26 before
+opening a change.
 
 ## Image evidence and version promotion
 

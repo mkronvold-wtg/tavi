@@ -38,9 +38,54 @@ permissions:
   security-events: write
 
 jobs:
+  changes:
+    name: Detect container-relevant changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      container_inputs: ${{ steps.filter.outputs.container_inputs }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Detect container-relevant changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            container_inputs:
+              - ".dockerignore"
+              - ".trivyignore.yaml"
+              - ".github/dependabot.yml"
+              - ".github/workflows/automerge-dependencies.yml"
+              - ".github/workflows/publish-images.yml"
+              - ".github/workflows/refresh-images.yml"
+              - ".github/workflows/trivy-scan.yml"
+              - "apps/**"
+              - "packages/**"
+              - "infra/docker/**"
+              - "scripts/update-release-pins.mjs"
+              - "package.json"
+              - ".node-version"
+              - "pnpm-lock.yaml"
+              - "pnpm-workspace.yaml"
+              - "turbo.json"
+              - "tsconfig.base.json"
+
   scan-local-images:
     name: Scan ${{ matrix.service }} image
-    if: github.event_name != 'workflow_run'
+    needs: changes
+    if: >-
+      always() &&
+      github.event_name != 'workflow_run' &&
+      (
+        github.event_name != 'pull_request' ||
+        needs.changes.result != 'success' ||
+        needs.changes.outputs.container_inputs == 'true'
+      )
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
