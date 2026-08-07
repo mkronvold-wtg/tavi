@@ -250,7 +250,12 @@ jobs:
 
   build-and-publish-internal:
     name: Publish internal ${{ matrix.service }} image
-    if: github.event_name != 'pull_request'
+    if: >-
+      github.event_name == 'push' &&
+      (
+        github.ref == 'refs/heads/main' ||
+        startsWith(github.ref, 'refs/tags/v')
+      )
     needs: validate
     runs-on:
       - self-hosted
@@ -342,7 +347,9 @@ jobs:
   create-release-pin-pull-request:
     name: Create immutable release-pin pull request
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs: build-and-publish
+    needs:
+      - build-and-publish
+      - build-and-publish-internal
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -364,23 +371,39 @@ jobs:
           path: image-digests
           merge-multiple: true
 
+      - name: Download internal image digests
+        uses: actions/download-artifact@v8
+        with:
+          pattern: internal-image-digest-*
+          path: internal-image-digests
+          merge-multiple: true
+
       - name: Update immutable image references
         env:
           API_DIGEST_FILE: image-digests/api.digest
+          INTERNAL_API_DIGEST_FILE: internal-image-digests/internal-api.digest
           RELEASE_TAG: ${{ github.ref_name }}
           GHCR_OWNER: ${{ steps.vars.outputs.owner }}
           WEB_DIGEST_FILE: image-digests/web.digest
+          INTERNAL_WEB_DIGEST_FILE: internal-image-digests/internal-web.digest
           WORKER_DIGEST_FILE: image-digests/worker.digest
+          INTERNAL_WORKER_DIGEST_FILE: internal-image-digests/internal-worker.digest
         run: |
           set -euo pipefail
           api_digest="$(cat "$API_DIGEST_FILE")"
           web_digest="$(cat "$WEB_DIGEST_FILE")"
           worker_digest="$(cat "$WORKER_DIGEST_FILE")"
+          internal_api_digest="$(cat "$INTERNAL_API_DIGEST_FILE")"
+          internal_web_digest="$(cat "$INTERNAL_WEB_DIGEST_FILE")"
+          internal_worker_digest="$(cat "$INTERNAL_WORKER_DIGEST_FILE")"
 
           node scripts/update-release-pins.mjs \
             --api "ghcr.io/$GHCR_OWNER/tavi-api:$RELEASE_TAG@$api_digest" \
             --web "ghcr.io/$GHCR_OWNER/tavi-web:$RELEASE_TAG@$web_digest" \
-            --worker "ghcr.io/$GHCR_OWNER/tavi-worker:$RELEASE_TAG@$worker_digest"
+            --worker "ghcr.io/$GHCR_OWNER/tavi-worker:$RELEASE_TAG@$worker_digest" \
+            --api-k8s "repo.ops.e2open.com/dcops-docker-repo/tavi-api:$RELEASE_TAG@$internal_api_digest" \
+            --web-k8s "repo.ops.e2open.com/dcops-docker-repo/tavi-web:$RELEASE_TAG@$internal_web_digest" \
+            --worker-k8s "repo.ops.e2open.com/dcops-docker-repo/tavi-worker:$RELEASE_TAG@$internal_worker_digest"
 
       - name: Create release-pin pull request
         uses: peter-evans/create-pull-request@v8
@@ -391,5 +414,5 @@ jobs:
           body: |
             Pins Docker Compose and every supported Kubernetes deployment variant to the immutable images published for `${{ github.ref_name }}`.
 
-            Each image uses both the release tag and its content digest. Review and merge this promotion pull request to deploy the release.
+            Compose uses public GHCR `tag@sha256:digest` references. Every Kubernetes deployment variant uses `repo.ops.e2open.com/dcops-docker-repo` `tag@sha256:digest` references. Review and merge this promotion pull request to deploy the release.
           title: "chore(release): pin ${{ github.ref_name }} images"
