@@ -6,9 +6,13 @@ const options = parseOptions(process.argv.slice(2));
 const references = Object.fromEntries(
   services.map((service) => [service, options[service]]),
 );
+const k8sReferences = Object.fromEntries(
+  services.map((service) => [service, options[`${service}-k8s`]]),
+);
 
 for (const service of services) {
-  validateReference(service, references[service]);
+  validateGhcrReference(service, references[service]);
+  validateK8sReference(service, k8sReferences[service]);
 }
 
 const repositoryRoot = process.cwd();
@@ -36,7 +40,7 @@ const deployments = await findDeploymentManifests(
 for (const deployment of deployments) {
   const service = basename(deployment).replace("-deployment.yaml", "");
   await updateFile(deployment, (content) =>
-    updateDeployment(content, service, references[service]),
+    updateDeployment(content, service, k8sReferences[service]),
   );
 }
 
@@ -52,6 +56,7 @@ if (changedFiles.length === 0) {
 
 function parseOptions(argumentsList) {
   const result = {};
+  const validKeys = new Set([...services, ...services.map((s) => `${s}-k8s`)]);
 
   for (let index = 0; index < argumentsList.length; index += 1) {
     const argument = argumentsList[index];
@@ -60,20 +65,22 @@ function parseOptions(argumentsList) {
       throw new Error(`Unexpected argument: ${argument}`);
     }
 
-    const service = argument.slice(2);
+    const key = argument.slice(2);
     const value = argumentsList[index + 1];
 
-    if (!services.includes(service) || !value || value.startsWith("--")) {
+    if (!validKeys.has(key) || !value || value.startsWith("--")) {
       throw new Error(
-        "Usage: node scripts/update-release-pins.mjs --api <image@digest> --web <image@digest> --worker <image@digest>",
+        "Usage: node scripts/update-release-pins.mjs " +
+          "--api <ghcr-ref> --web <ghcr-ref> --worker <ghcr-ref> " +
+          "--api-k8s <art-ref> --web-k8s <art-ref> --worker-k8s <art-ref>",
       );
     }
 
-    if (result[service]) {
-      throw new Error(`Duplicate --${service} option.`);
+    if (result[key]) {
+      throw new Error(`Duplicate --${key} option.`);
     }
 
-    result[service] = value;
+    result[key] = value;
     index += 1;
   }
 
@@ -81,19 +88,35 @@ function parseOptions(argumentsList) {
     if (!result[service]) {
       throw new Error(`Missing --${service} image reference.`);
     }
+
+    if (!result[`${service}-k8s`]) {
+      throw new Error(`Missing --${service}-k8s image reference.`);
+    }
   }
 
   return result;
 }
 
-function validateReference(service, reference) {
+function validateGhcrReference(service, reference) {
   const expression = new RegExp(
     `^ghcr\\.io/[a-z0-9][a-z0-9._-]*/tavi-${service}:[A-Za-z0-9._-]+@sha256:[a-f0-9]{64}$`,
   );
 
   if (!expression.test(reference)) {
     throw new Error(
-      `Invalid ${service} image reference. Expected ghcr.io/<owner>/tavi-${service}:<tag>@sha256:<digest>.`,
+      `Invalid ${service} GHCR reference. Expected ghcr.io/<owner>/tavi-${service}:<tag>@sha256:<digest>.`,
+    );
+  }
+}
+
+function validateK8sReference(service, reference) {
+  const expression = new RegExp(
+    `^repo\\.ops\\.e2open\\.com/dcops-docker-repo/tavi-${service}:[A-Za-z0-9._-]+@sha256:[a-f0-9]{64}$`,
+  );
+
+  if (!expression.test(reference)) {
+    throw new Error(
+      `Invalid ${service} K8s reference. Expected repo.ops.e2open.com/dcops-docker-repo/tavi-${service}:<tag>@sha256:<digest>.`,
     );
   }
 }
@@ -124,7 +147,7 @@ async function findDeploymentManifests(directory) {
 
 function updateDeployment(content, service, reference) {
   const imageExpression =
-    /image:\s*ghcr\.io\/[a-z0-9][a-z0-9._-]*\/tavi-(api|web|worker):[A-Za-z0-9._-]+@sha256:[a-f0-9]{64}/g;
+    /image:\s*repo\.ops\.e2open\.com\/dcops-docker-repo\/tavi-(api|web|worker):[A-Za-z0-9._-]+@sha256:[a-f0-9]{64}/g;
   let imageCount = 0;
 
   const withImage = content.replace(imageExpression, (image, imageService) => {
@@ -168,7 +191,11 @@ async function updateFile(filePath, transform) {
 
   if (updated !== content) {
     await writeFile(filePath, updated, "utf8");
-    changedFiles.push(filePath.replace(`${repositoryRoot}\\`, ""));
+    changedFiles.push(
+      filePath
+        .replace(repositoryRoot + "/", "")
+        .replace(repositoryRoot + "\\", ""),
+    );
   }
 }
 

@@ -19,9 +19,11 @@ spec:
     spec:
       securityContext:
         fsGroup: 1000
+      imagePullSecrets:
+        - name: regcred
       containers:
         - name: worker
-          image: ghcr.io/mkronvold-wtg/tavi-worker:sha-69b0417@sha256:ee700eda62e8bacd79d0c225d463788e94064fc3275de983aededbe828deabf4
+          image: repo.ops.e2open.com/dcops-docker-repo/tavi-worker:sha-69b0417@sha256:ee700eda62e8bacd79d0c225d463788e94064fc3275de983aededbe828deabf4
           imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:

@@ -13,9 +13,11 @@ spec:
       labels:
         app: tavi-web
     spec:
+      imagePullSecrets:
+        - name: regcred
       containers:
         - name: web
-          image: ghcr.io/mkronvold-wtg/tavi-web:sha-69b0417@sha256:0cbb2372de0b38b0dc73c37bc936ee3f7dc1be988a55918f8e19b63bda6053ee
+          image: repo.ops.e2open.com/dcops-docker-repo/tavi-web:sha-69b0417@sha256:0cbb2372de0b38b0dc73c37bc936ee3f7dc1be988a55918f8e19b63bda6053ee
           imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:

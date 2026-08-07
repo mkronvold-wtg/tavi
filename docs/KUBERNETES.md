@@ -15,11 +15,19 @@ Tavi now ships four complete raw-manifest deployment paths under `infra/k8s/`. P
 
 1. A Kubernetes cluster with a compatible ingress controller using `ingressClassName: contour` by default.
 2. `kubectl` access with permission to create resources in the `tavi` namespace. The HA internal-database path also needs permission to create cluster-scoped CloudNativePG resources and resources in `cnpg-system`.
-3. A namespace-local `regcred` image-pull secret that authenticates the registry hosting the Tavi images. Do not commit its credentials; create it before applying app workloads.
-4. Access to:
-   - `ghcr.io/mkronvold-wtg/tavi-api`
-   - `ghcr.io/mkronvold-wtg/tavi-web`
-   - `ghcr.io/mkronvold-wtg/tavi-worker`
+3. A namespace-local `regcred` image-pull secret in the `tavi` namespace that authenticates `repo.ops.e2open.com`. Do not commit its credentials; create it before applying app workloads:
+
+   ```bash
+   kubectl create secret docker-registry regcred \
+     --namespace tavi \
+     --docker-server=repo.ops.e2open.com \
+     --docker-username=<your-username> \
+     --docker-password=<your-password>
+   ```
+
+   The secret name must be exactly `regcred` because every app deployment specifies `imagePullSecrets: [{name: regcred}]`. Recreate it in each namespace where you deploy Tavi; pull secrets are namespace-local and are not shared across namespaces.
+
+4. Access to `repo.ops.e2open.com/dcops-docker-repo` for Kubernetes workloads (see `regcred` above). Docker Compose and public images remain on GHCR and do not require this secret.
 5. A strong `COOKIE_SECRET`.
 
 Additional variant-specific requirements:
@@ -41,7 +49,7 @@ Each variant README follows the same pattern:
 
 1. Edit `configmap.yaml` and `ingress.yaml` in the chosen folder for your hostname and public URLs.
 2. Create real secrets from that folder's `secret.example.yaml`.
-3. Create `regcred` in the target namespace with credentials for the selected image registry.
+3. Create `regcred` in the target namespace (see [Shared requirements](#shared-requirements) for the exact command). The `regcred` secret is namespace-local and must be recreated in every namespace where Tavi app workloads run.
 4. Review that folder's `backup-pvc.yaml`. The API and worker share the backup volume, so the storage class must support `ReadWriteMany`.
 5. Internal DB variants also ship an optional `postgres-network-policy.example.yaml` you can customize and apply if your cluster uses NetworkPolicy to limit Postgres access to the API and worker pods.
 6. Apply the manifests from that folder only.
@@ -82,10 +90,11 @@ image.
 
 ## Immutable image releases
 
-Every app deployment now uses a `tag@sha256:digest` reference with
-`imagePullPolicy: IfNotPresent`. A version-tagged image publish opens a
-release-pin pull request that updates all four Kubernetes variants together.
-Review and merge that PR, then apply the selected variant:
+Every app deployment uses a `tag@sha256:digest` reference pulled from
+`repo.ops.e2open.com/dcops-docker-repo` with `imagePullPolicy: IfNotPresent`.
+A version-tagged image publish opens a release-pin pull request that updates
+all four Kubernetes variants together with Artifactory `tag@sha256:digest`
+references. Review and merge that PR, then apply the selected variant:
 
 ```bash
 kubectl apply -k infra/k8s/k8s-with-external-db
@@ -98,6 +107,9 @@ Use the matching variant path in place of `k8s-with-external-db`. To roll back,
 revert the release-pin commit, reapply the selected variant, and watch the
 same rollout statuses. Candidate `latest` and weekly `refresh-*` images are
 not deployment inputs.
+
+Docker Compose and public-facing image references use GHCR
+(`ghcr.io/mkronvold-wtg`) and do not require `regcred`.
 
 Third-party Node, PostgreSQL, and Alpine image inputs are also digest-pinned
 and updated by Dependabot. The CloudNativePG operator bundle remains a

@@ -9,12 +9,12 @@ See [`LCM.md`](./LCM.md) for promotion and rollback, and
 
 ## Workflows
 
-| Workflow                        | When it runs                                               | What it does                                                                                                                                                                      |
-| ------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Detects container-relevant PR changes; validates and builds API/web/worker images only when needed, publishing immutable evidence outside PRs. A `v*` tag opens a release-pin PR. |
-| `Scan container images`         | Every PR, `main`, manual dispatch, or a successful refresh | Detects container-relevant PR changes; scans applicable API, web, and worker images with Trivy and uploads High/Critical SARIF findings to GitHub code scanning.                  |
-| `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans candidate `latest` and timestamped refresh images. It does not deploy them.                                                     |
-| `Auto-merge dependency updates` | Dependabot PR events                                       | Approves supported patch/minor npm, GitHub Actions, and Docker updates after required checks succeed. Major updates remain manual.                                                |
+| Workflow                        | When it runs                                               | What it does                                                                                                                                                                                                                                           |
+| ------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Detects container-relevant PR changes; validates and builds API/web/worker images only when needed, publishing public GHCR images and internal Artifactory images from the trusted `docker-wtg` runner outside PRs. A `v*` tag opens a release-pin PR. |
+| `Scan container images`         | Every PR, `main`, manual dispatch, or a successful refresh | Detects container-relevant PR changes; scans applicable API, web, and worker images with Trivy and uploads High/Critical SARIF findings to GitHub code scanning.                                                                                       |
+| `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans candidate `latest` and timestamped refresh images; also refreshes internal Artifactory images from `docker-wtg`. It does not deploy them.                                                            |
+| `Auto-merge dependency updates` | Dependabot PR events                                       | Approves supported patch/minor npm, GitHub Actions, and Docker updates after required checks succeed. Major updates remain manual.                                                                                                                     |
 
 ## Validation
 
@@ -36,19 +36,45 @@ publishing. If change detection fails, the workflows run the full validation
 instead of skipping it. Run the same root commands locally with Node 26 before
 opening a change.
 
+## Internal Artifactory publication
+
+Trusted pushes to the default branch or a version tag (`v*`) build API, web,
+and worker images again on the repository-scoped `docker-wtg` self-hosted
+runner. Those images are published to
+`sv4.art.e2open.com/dcops-docker-repo/tavi-{api,web,worker}` with the same
+`latest`, ref, and SHA tag policy as public images. The runner's host-local
+Docker configuration supplies the Artifactory credential; no registry
+credential is stored in the workflow.
+
+The `build-and-publish-internal` job is gated to
+`github.event_name == 'push'` limited to `refs/heads/main` or
+`refs/tags/v*`. Neither `workflow_dispatch` nor any other branch ref can
+reach it; the checkout step is unreachable for those event types. Scheduled
+refreshes enforce the same default-branch guard.
+
+The internal matrix is serialized because Tavi currently has one matching
+runner. GitHub-hosted runners continue to build and publish public GHCR
+images, while Kubernetes deployments consume the internal Artifactory service
+through `repo.ops.e2open.com`.
+
+This lane establishes internal publication only. BSI base-image selection and
+Xray policy enforcement remain separate migration work.
+
 ## Image evidence and version promotion
 
-Every published image receives BuildKit SBOM and provenance attestations. The
-workflow also generates a CycloneDX SBOM and a High/Critical Trivy report from
-the exact remote digest for each service, retaining them as workflow artifacts
-for 180 days alongside the published digest.
+Every published image receives BuildKit SBOM and provenance attestations.
+Public GHCR publication also generates a CycloneDX SBOM and a High/Critical
+Trivy report from the exact remote digest for each service, retaining them as
+workflow artifacts for 180 days alongside the published digest. Internal
+Artifactory publication retains its immutable digest as a workflow artifact.
 
-For a `v*` tag, the workflow downloads those three digest records and uses
+For a `v*` tag, the workflow downloads the public GHCR digest records and the
+internal Artifactory digest records, then uses
 [`scripts/update-release-pins.mjs`](../scripts/update-release-pins.mjs) to
 create a pull request that updates:
 
-- `infra/docker/compose-prod.images.env`
-- API, web, and worker deployments in all supported raw Kubernetes variants
+- `infra/docker/compose-prod.images.env` — GHCR `tag@sha256:digest` references
+- API, web, and worker deployments in all supported raw Kubernetes variants — `repo.ops.e2open.com/dcops-docker-repo` `tag@sha256:digest` references
 
 The PR is the promotion handoff. Images are always expressed as
 `tag@sha256:digest`; candidate `latest` and `refresh-*` tags never alter a
