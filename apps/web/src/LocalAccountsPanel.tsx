@@ -2124,22 +2124,22 @@ function parseLocalAccountsJsonImport(content: string): ImportLocalAccountsPaylo
   return parsedContent as ImportLocalAccountsPayload;
 }
 
-async function parseLocalAccountsCsvImport(
+function parseLocalAccountsCsvImport(
   content: string,
-): Promise<ImportLocalAccountsPayload> {
-  const { read, utils } = await import("xlsx");
-  const workbook = read(content, { type: "string" });
-  const firstSheetName = workbook.SheetNames[0];
+): ImportLocalAccountsPayload {
+  const [headerRow, ...dataRows] = parseLocalAccountsCsvRows(content);
 
-  if (!firstSheetName) {
+  if (!headerRow || headerRow.every((value) => value.trim() === "")) {
     throw new Error("Choose a CSV file with name, email, role, and optional password columns.");
   }
 
-  const firstSheet = workbook.Sheets[firstSheetName];
-  const rows = utils.sheet_to_json<Record<string, unknown>>(firstSheet, {
-    defval: "",
-  });
-  const accounts = rows.flatMap((row, index) => {
+  const accounts = dataRows.flatMap((values, index) => {
+    const row = Object.fromEntries(
+      headerRow.map((header, columnIndex) => [
+        header,
+        values[columnIndex] ?? "",
+      ]),
+    );
     const parsedRow = parseLocalAccountsCsvRow(row, index + 2);
 
     return parsedRow ? [parsedRow] : [];
@@ -2150,6 +2150,65 @@ async function parseLocalAccountsCsvImport(
   }
 
   return { accounts };
+}
+
+function parseLocalAccountsCsvRows(content: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let value = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < content.length; index += 1) {
+    const character = content[index];
+
+    if (inQuotes) {
+      if (character === '"') {
+        if (content[index + 1] === '"') {
+          value += '"';
+          index += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        value += character;
+      }
+
+      continue;
+    }
+
+    if (character === '"' && value === "") {
+      inQuotes = true;
+    } else if (character === ",") {
+      row.push(value);
+      value = "";
+    } else if (character === "\n" || character === "\r") {
+      row.push(value);
+      rows.push(row);
+      row = [];
+      value = "";
+
+      if (character === "\r" && content[index + 1] === "\n") {
+        index += 1;
+      }
+    } else {
+      value += character;
+    }
+  }
+
+  if (inQuotes) {
+    throw new Error("CSV file contains an unterminated quoted value.");
+  }
+
+  if (value !== "" || row.length > 0) {
+    row.push(value);
+    rows.push(row);
+  }
+
+  if (rows[0]?.[0]?.charCodeAt(0) === 0xfeff) {
+    rows[0][0] = rows[0][0].slice(1);
+  }
+
+  return rows;
 }
 
 function parseLocalAccountsCsvRow(

@@ -1,4 +1,5 @@
 import { appName, appVersion } from "@tavi/config";
+import writeXlsxFile from "write-excel-file/browser";
 import type { GroupBy, ProjectSortField, ProjectStatus } from "./types";
 import type { WorkspaceProject, WorkspaceTask } from "./types";
 
@@ -127,13 +128,15 @@ export function downloadWorkspaceCsv(context: ExportContext) {
 
 export async function downloadWorkspaceXlsx(context: ExportContext) {
   const rows = buildWorkspaceExportRows(context);
-  const { utils, write } = await import("xlsx");
-  const worksheet = utils.json_to_sheet(rows, {
-    header: [...WORKSPACE_EXPORT_COLUMNS],
-  });
-  const workbook = utils.book_new();
-  utils.book_append_sheet(workbook, worksheet, "Workspace");
-  const content = write(workbook, { bookType: "xlsx", type: "array" });
+  const sheetData = [
+    [...WORKSPACE_EXPORT_COLUMNS],
+    ...rows.map((row) =>
+      WORKSPACE_EXPORT_COLUMNS.map((column) => row[column] ?? ""),
+    ),
+  ];
+  const content = await writeXlsxFile(sheetData, {
+    sheet: "Workspace",
+  }).toBlob();
 
   downloadBlob(
     buildFileName("workspace", "xlsx"),

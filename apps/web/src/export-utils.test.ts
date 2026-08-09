@@ -1,10 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceProject } from "./types";
 import {
   buildLoopExportRows,
   buildWorkspaceExportRows,
   createCsvContent,
+  downloadWorkspaceXlsx,
 } from "./export-utils";
+
+const writeXlsxFileMock = vi.hoisted(() => vi.fn());
+
+vi.mock("write-excel-file/browser", () => ({
+  default: writeXlsxFileMock,
+}));
 
 const sampleProjects: WorkspaceProject[] = [
   {
@@ -49,6 +56,12 @@ const sampleProjects: WorkspaceProject[] = [
 ];
 
 describe("export-utils", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    writeXlsxFileMock.mockReset();
+  });
+
   it("builds workspace export rows with project and task notes", () => {
     expect(
       buildWorkspaceExportRows({ groupBy: "owner", projects: sampleProjects }),
@@ -85,5 +98,57 @@ describe("export-utils", () => {
 
     expect(content).toContain("Title,Notes");
     expect(content).toContain('"Needs ""quotes"""');
+  });
+
+  it("downloads an XLSX workbook with the current workspace rows", async () => {
+    const workbookContent = new Blob(["xlsx-content"]);
+    const toBlob = vi.fn(async () => workbookContent);
+    const createObjectURL = vi.fn<(blob: Blob) => string>(
+      () => "blob:workspace",
+    );
+    const revokeObjectURL = vi.fn();
+    const downloadedFileNames: string[] = [];
+
+    writeXlsxFileMock.mockReturnValue({ toBlob });
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      downloadedFileNames.push(this.download);
+    });
+
+    await downloadWorkspaceXlsx({
+      assigneeUserIds: [],
+      groupBy: "owner",
+      projects: sampleProjects,
+      search: "",
+      sortBy: [],
+      statusFilters: [],
+    });
+
+    expect(writeXlsxFileMock).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.arrayContaining(["Group", "Project Title", "Task Status"]),
+        expect.arrayContaining(["Taylor", "Roadmap refresh", "blocked"]),
+      ]),
+      { sheet: "Workspace" },
+    );
+    expect(toBlob).toHaveBeenCalledOnce();
+    expect(downloadedFileNames).toEqual([
+      `tavi-workspace-${new Date().toISOString().slice(0, 10)}.xlsx`,
+    ]);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:workspace");
+
+    const downloadedBlob = createObjectURL.mock.calls[0]?.[0];
+    expect(downloadedBlob).toBeInstanceOf(Blob);
+
+    if (!downloadedBlob) {
+      throw new Error("Expected XLSX content to be downloaded.");
+    }
+
+    expect(downloadedBlob.type).toBe(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    await expect(downloadedBlob.text()).resolves.toBe("xlsx-content");
   });
 });

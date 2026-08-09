@@ -854,8 +854,8 @@ describe("LocalAccountsPanel", () => {
             accounts: [
               {
                 email: "new.user@tavi.local",
-                name: "New User",
-                password: "new-password-123",
+                name: "New, User",
+                password: 'new-"password"',
                 role: "editor",
               },
             ],
@@ -868,7 +868,7 @@ describe("LocalAccountsPanel", () => {
             createAccountRecord(
               "user-2",
               "new.user@tavi.local",
-              "New User",
+              "New, User",
               "editor",
             ),
           ],
@@ -908,7 +908,7 @@ describe("LocalAccountsPanel", () => {
     Object.defineProperty(importFile, "text", {
       value: vi.fn(
         async () =>
-          "name,email,role,password\nNew User,new.user@tavi.local,editor,new-password-123\n",
+          'name,email,role,password\n"New, User",new.user@tavi.local,editor,"new-""password"""\n',
       ),
     });
 
@@ -936,6 +936,69 @@ describe("LocalAccountsPanel", () => {
     expect(onNotice).toHaveBeenCalledWith(
       "Imported 1 local account (1 created, 0 updated, 0 unchanged).",
     );
+  });
+
+  it("shows malformed CSV import errors without sending account changes", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url.endsWith("/auth/accounts") && !init?.method) {
+        return createResponse({
+          accounts: [
+            createAccountRecord(
+              "user-1",
+              "admin@tavi.local",
+              "Admin",
+              "admin",
+            ),
+          ],
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container } = renderPanel(adminUser, true);
+
+    await waitFor(() => {
+      expect(screen.getByText("admin@tavi.local")).toBeInTheDocument();
+    });
+
+    const fileInput = container.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement | null;
+    const importFile = new File(["placeholder"], "local-accounts.csv", {
+      type: "text/csv",
+    });
+
+    expect(fileInput).not.toBeNull();
+    Object.defineProperty(importFile, "text", {
+      value: vi.fn(
+        async () =>
+          'name,email,role,password\n"New User,new.user@tavi.local,editor,new-password-123',
+      ),
+    });
+
+    fireEvent.change(fileInput!, {
+      target: {
+        files: [importFile],
+      },
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("CSV file contains an unterminated quoted value."),
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      fetchMock.mock.calls.some(([input, init]) => {
+        const url = typeof input === "string" ? input : input.toString();
+        return url.endsWith("/auth/accounts/import") && init?.method === "POST";
+      }),
+    ).toBe(false);
   });
 
   it("asks whether duplicate imported emails should overwrite existing accounts", async () => {
