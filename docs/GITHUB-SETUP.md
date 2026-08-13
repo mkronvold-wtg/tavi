@@ -9,7 +9,7 @@ This page lists repository settings that support Tavi's lifecycle automation.
 3. Enable Dependabot alerts and Dependabot security updates.
 4. Enable Dependabot version updates from `.github/dependabot.yml`.
 5. Enable code scanning so Trivy SARIF findings appear under GitHub Security.
-6. Enable auto-merge for the repository if patch/minor Dependabot PRs should merge automatically after required checks pass.
+6. Enable auto-merge for the repository if supported Dependabot PRs should merge automatically after required checks pass.
 
 ## Workflow permissions
 
@@ -49,9 +49,10 @@ Require:
 4. `Scan web image`
 5. `Scan worker image`
 
-Keep major dependency updates manual even when auto-merge is enabled. Confirm
-that Dependabot security updates are enabled in repository settings as well as
-version updates from `.github/dependabot.yml`.
+All supported Dependabot updates, including major updates, wait for the same
+required checks before merging. Confirm that Dependabot security updates are
+enabled in repository settings as well as version updates from
+`.github/dependabot.yml`.
 
 ## GHCR package visibility
 
