@@ -1,4 +1,15 @@
 version: 2
+registries:
+  # Public Artifactory edge used when a Docker dependency is expressed against
+  # sv4.art.e2open.com. Cluster pins may still use repo.ops.e2open.com; those
+  # Tavi app images are release-managed and ignored below because Dependabot
+  # runners cannot resolve the internal ops hostname.
+  artifactory-docker:
+    type: docker-registry
+    url: https://sv4.art.e2open.com
+    username: ${{ secrets.ARTIFACTORY_USERNAME }}
+    password: ${{ secrets.ARTIFACTORY_TOKEN }}
+
 updates:
   - package-ecosystem: npm
     directory: /
@@ -37,6 +48,8 @@ updates:
     directory: /infra/docker
     schedule:
       interval: weekly
+    registries:
+      - artifactory-docker
     groups:
       docker-all:
         patterns:
@@ -46,22 +59,61 @@ updates:
           - minor
           - patch
 
+  # Only track public third-party images in Kubernetes manifests (for example
+  # postgres). Tavi api/web/worker pins are immutable release artifacts updated
+  # by the publish/release-pin path, not Dependabot.
   - package-ecosystem: docker
     directory: /infra/k8s/k8s-with-external-db
     schedule:
       interval: weekly
+    registries:
+      - artifactory-docker
+    ignore:
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-api"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-web"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-worker"
 
   - package-ecosystem: docker
     directory: /infra/k8s/k8s-with-internal-db
     schedule:
       interval: weekly
+    registries:
+      - artifactory-docker
+    ignore:
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-api"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-web"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-worker"
 
   - package-ecosystem: docker
     directory: /infra/k8s/k8s-with-replicas-and-external-db
     schedule:
       interval: weekly
+    registries:
+      - artifactory-docker
+    ignore:
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-api"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-web"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-worker"
 
   - package-ecosystem: docker
     directory: /infra/k8s/k8s-with-replicas-and-internal-ha-db
     schedule:
       interval: weekly
+    registries:
+      - artifactory-docker
+    ignore:
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-api"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-web"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-worker"

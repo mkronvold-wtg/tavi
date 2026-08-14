@@ -75,6 +75,23 @@ If the repository or packages are private, deployment hosts need permission to p
 
 Use `docker login ghcr.io` for Docker hosts or an image pull secret for Kubernetes clusters.
 
+## Artifactory publish secrets
+
+Internal image publish jobs on the repository-scoped `docker-wtg` runner log in
+to `sv4.art.e2open.com` with repository secrets (not host-local Docker config):
+
+| Secret | Purpose |
+| ------ | ------- |
+| `ARTIFACTORY_USERNAME` | Artifactory username (often an email identity) |
+| `ARTIFACTORY_TOKEN` | Artifactory identity/API token with push to `dcops-docker-repo` |
+
+Set the same two names as **Dependabot secrets** as well
+(`gh secret set … --app dependabot`) so `.github/dependabot.yml` can use the
+`artifactory-docker` registry when a Docker dependency points at
+`sv4.art.e2open.com`.
+
+Rotate the token in GitHub only; workflows pick up the new value on the next run.
+
 ## `tavi-dev` candidate deploy secrets
 
 After internal Artifactory publish, CI deploys `sha-*` candidates to non-prod
