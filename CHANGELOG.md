@@ -2,10 +2,23 @@
 
 This file records the versions released in repository history. Section headings include the version, release commit date, and short release commit SHA currently present in git history.
 
+Weekly automation folds `## Unreleased` into a versioned section every Friday.
+Use optional markers under Unreleased to control the bump:
+
+- `### Features` or `### Breaking Changes` → minor bump
+- otherwise → patch bump
+
 ## Unreleased
 
 - After internal Artifactory `sha-*` image publish, automatically deploy those candidates to non-prod `tavi-dev` by SSHing from the `docker-wtg` runner to the jump host and running external `update.sh`.
 - Documented the `tavi-dev` candidate channel and required `TAVI_DEV_SSH_*` repository secrets.
+- Added standardized light and dark workspace themes with aligned application color tokens.
+- Added Trivy container-image and repository-configuration scanning with GitHub code-scanning SARIF reports, and hardened required CI checks so they run on every pull request.
+- Hardened container publishing and deployment workflows with a trusted internal-registry push gate, resilient image-cache exports, and immutable release pins for Docker Compose and Kubernetes.
+- Fixed deployed API and worker images to retain the generated Prisma client, and added Docker host helper scripts for safe stack startup, shutdown, and GHCR image auto-updates.
+- Moved Kubernetes deployment image pins to the internal Artifactory registry and documented the required namespace-local `regcred` image-pull secret.
+- Replaced the vulnerable SheetJS browser dependency while preserving workspace XLSX export and local-account CSV import behavior.
+- Patched security-sensitive transitive dependencies, including Fastify URI parsing, `js-yaml`, `brace-expansion`, and `nanoid`.
 
 ## 0.9.22 - 2026-06-12 - sha-a229b90
 

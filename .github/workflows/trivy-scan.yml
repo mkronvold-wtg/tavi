@@ -9,12 +9,15 @@ on:
     paths:
       - ".dockerignore"
       - ".trivyignore.yaml"
+      - ".github/workflows/cut-release.yml"
       - ".github/workflows/publish-images.yml"
       - ".github/workflows/refresh-images.yml"
+      - ".github/workflows/tag-release.yml"
       - ".github/workflows/trivy-scan.yml"
       - "apps/**"
       - "packages/**"
       - "infra/docker/**"
+      - "scripts/**"
       - "package.json"
       - ".node-version"
       - "pnpm-lock.yaml"
@@ -53,7 +56,7 @@ jobs:
 
       - name: Detect container-relevant changes
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             container_inputs:
@@ -61,19 +64,36 @@ jobs:
               - ".trivyignore.yaml"
               - ".github/dependabot.yml"
               - ".github/workflows/automerge-dependencies.yml"
+              - ".github/workflows/cut-release.yml"
               - ".github/workflows/publish-images.yml"
               - ".github/workflows/refresh-images.yml"
+              - ".github/workflows/tag-release.yml"
               - ".github/workflows/trivy-scan.yml"
               - "apps/**"
               - "packages/**"
               - "infra/docker/**"
-              - "scripts/update-release-pins.mjs"
+              - "scripts/**"
               - "package.json"
               - ".node-version"
               - "pnpm-lock.yaml"
               - "pnpm-workspace.yaml"
               - "turbo.json"
               - "tsconfig.base.json"
+
+  scan-not-required:
+    name: Scan ${{ matrix.service }} image
+    needs: changes
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.changes.result == 'success' &&
+      needs.changes.outputs.container_inputs != 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api, web, worker]
+    steps:
+      - name: Mark required check successful
+        run: echo "No container-relevant changes; ${{ matrix.service }} image scan not required."
 
   scan-local-images:
     name: Scan ${{ matrix.service }} image
@@ -120,12 +140,17 @@ jobs:
           trivyignores: .trivyignore.yaml
           exit-code: "0"
 
-      - name: Upload scan results
+      # Defer code-scanning upload to upload-code-scanning so GHAS receives every
+      # category together. Parallel per-job uploads race the PR check and surface
+      # "configurations not found" for categories still in flight.
+      - name: Upload SARIF artifact
         if: always() && hashFiles(format('trivy-{0}.sarif', matrix.service)) != ''
-        uses: github/codeql-action/upload-sarif@v4
+        uses: actions/upload-artifact@v7
         with:
-          sarif_file: trivy-${{ matrix.service }}.sarif
-          category: trivy-${{ matrix.service }}
+          name: trivy-sarif-${{ matrix.service }}
+          path: trivy-${{ matrix.service }}.sarif
+          if-no-files-found: error
+          retention-days: 5
 
       - name: Enforce high and critical vulnerabilities
         uses: aquasecurity/trivy-action@v0.36.0
@@ -158,11 +183,98 @@ jobs:
           trivyignores: .trivyignore.yaml
           exit-code: "0"
 
-      - name: Upload filesystem scan results
+      - name: Upload SARIF artifact
         if: always() && hashFiles('trivy-filesystem.sarif') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-sarif-filesystem
+          path: trivy-filesystem.sarif
+          if-no-files-found: error
+          retention-days: 5
+
+  upload-code-scanning:
+    name: Upload Trivy code scanning results
+    needs:
+      - scan-local-images
+      - scan-filesystem
+    if: >-
+      always() &&
+      github.event_name != 'workflow_run' &&
+      needs.scan-filesystem.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Download SARIF artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: trivy-sarif-*
+          merge-multiple: true
+          path: sarif
+        continue-on-error: true
+
+      - name: Ensure code scanning categories
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p sarif
+
+          # Empty SARIF keeps GHAS categories stable when image scans are skipped
+          # (non-container PRs) or a matrix leg produced no report. Security gating
+          # remains the per-image enforce step and required Scan * image checks.
+          empty_sarif='{
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [
+              {
+                "tool": {
+                  "driver": {
+                    "name": "Trivy",
+                    "informationUri": "https://github.com/aquasecurity/trivy",
+                    "rules": []
+                  }
+                },
+                "results": []
+              }
+            ]
+          }'
+
+          for category in api web worker filesystem; do
+            file="sarif/trivy-${category}.sarif"
+            if [[ ! -f "${file}" ]]; then
+              printf '%s\n' "${empty_sarif}" > "${file}"
+              echo "Created placeholder SARIF for trivy-${category}"
+            else
+              echo "Using scanned SARIF for trivy-${category}"
+            fi
+          done
+
+      # Upload sequentially in one job so the PR code-scanning check sees the full
+      # set of categories that exist on main (trivy-api/web/worker/filesystem).
+      - name: Upload api results
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: trivy-filesystem.sarif
+          sarif_file: sarif/trivy-api.sarif
+          category: trivy-api
+
+      - name: Upload web results
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif/trivy-web.sarif
+          category: trivy-web
+
+      - name: Upload worker results
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif/trivy-worker.sarif
+          category: trivy-worker
+
+      - name: Upload filesystem results
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif/trivy-filesystem.sarif
           category: trivy-filesystem
 
   scan-refreshed-images:
