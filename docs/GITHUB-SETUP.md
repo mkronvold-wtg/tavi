@@ -70,3 +70,31 @@ If the repository or packages are private, deployment hosts need permission to p
 - `ghcr.io/mkronvold-wtg/tavi-worker`
 
 Use `docker login ghcr.io` for Docker hosts or an image pull secret for Kubernetes clusters.
+
+## `tavi-dev` candidate deploy secrets
+
+After internal Artifactory publish, CI deploys `sha-*` candidates to non-prod
+`tavi-dev` by SSHing from the `docker-wtg` runner to the jump host and running
+`update.sh`. Configure these repository secrets before the job can succeed:
+
+| Secret | Purpose |
+| ------ | ------- |
+| `TAVI_DEV_SSH_KEY` | Private key accepted by the jump host for the deploy user |
+| `TAVI_DEV_SSH_HOST` | Jump host hostname (for example `sv4d-jump`) |
+| `TAVI_DEV_SSH_USER` | SSH username on the jump host |
+
+Optional repository variable:
+
+| Variable | Purpose | Default |
+| -------- | ------- | ------- |
+| `TAVI_DEV_UPDATE_SCRIPT` | Absolute path to `update.sh` on the jump host | `/e2open/home/mkronvold/src/tavi-dev/update.sh` |
+
+Cluster-side prerequisites (not stored in GitHub):
+
+1. Jump host can run `update.sh` and reach cluster `sv4d-cops-nonp`.
+2. Namespace `tavi-dev` exists with image pull secret `regcred` for
+   `repo.ops.e2open.com`.
+3. The helper's Tavi source checkout stays usable for manifest generation.
+
+This automation does not deploy weekly `refresh-*` tags and does not modify
+checked-in production pins.

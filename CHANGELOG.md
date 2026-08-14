@@ -10,6 +10,8 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+- After internal Artifactory `sha-*` image publish, automatically deploy those candidates to non-prod `tavi-dev` by SSHing from the `docker-wtg` runner to the jump host and running external `update.sh`.
+- Documented the `tavi-dev` candidate channel and required `TAVI_DEV_SSH_*` repository secrets.
 - Added standardized light and dark workspace themes with aligned application color tokens.
 - Added Trivy container-image and repository-configuration scanning with GitHub code-scanning SARIF reports, and hardened required CI checks so they run on every pull request.
 - Hardened container publishing and deployment workflows with a trusted internal-registry push gate, resilient image-cache exports, and immutable release pins for Docker Compose and Kubernetes.

@@ -11,7 +11,7 @@ See [`LCM.md`](./LCM.md) for promotion and rollback, and
 
 | Workflow                        | When it runs                                               | What it does                                                                                                                                                                                                                                           |
 | ------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Detects container-relevant PR changes; validates and builds API/web/worker images only when needed, publishing public GHCR images and internal Artifactory images from the trusted `docker-wtg` runner outside PRs. A `v*` tag opens a release-pin PR. |
+| `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Detects container-relevant PR changes; validates and builds API/web/worker images only when needed, publishing public GHCR images and internal Artifactory images from the trusted `docker-wtg` runner outside PRs. After internal `sha-*` publish, deploys those candidates to non-prod `tavi-dev` via jump-host `update.sh`. A `v*` tag also opens a release-pin PR. |
 | `Scan container images`         | Every PR, `main`, manual dispatch, or a successful refresh | Detects container-relevant PR changes; scans applicable API, web, and worker images with Trivy and uploads High/Critical SARIF findings to GitHub code scanning.                                                                                       |
 | `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans candidate `latest` and timestamped refresh images; also refreshes internal Artifactory images from `docker-wtg`. It does not deploy them.                                                            |
 | `Cut weekly release`            | Fridays at 13:00 UTC or manual dispatch                    | Opens a version-bump PR from the latest default-branch tip when there is work to release. Patch by default; minor when `CHANGELOG.md` Unreleased contains a marked Features or Breaking section. Enables auto-merge after required checks.           |
@@ -59,8 +59,30 @@ runner. GitHub-hosted runners continue to build and publish public GHCR
 images, while Kubernetes deployments consume the internal Artifactory service
 through `repo.ops.e2open.com`.
 
-This lane establishes internal publication only. BSI base-image selection and
-Xray policy enforcement remain separate migration work.
+### Candidate deploy to `tavi-dev`
+
+After all three internal images publish successfully, the `Deploy candidates to
+tavi-dev` job runs on the same `docker-wtg` runner and SSHes to the jump host
+configured by repository secrets. It invokes the external
+`tavi-dev/update.sh` helper with the short commit id that matches the
+Artifactory `sha-<shortsha>` tags (docker metadata short SHA, 7 hex chars).
+
+| Input | Source |
+| ----- | ------ |
+| SSH private key | secret `TAVI_DEV_SSH_KEY` |
+| SSH host | secret `TAVI_DEV_SSH_HOST` (for example `sv4d-jump`) |
+| SSH user | secret `TAVI_DEV_SSH_USER` |
+| Remote helper path | optional variable `TAVI_DEV_UPDATE_SCRIPT` (default `/e2open/home/mkronvold/src/tavi-dev/update.sh`) |
+| Candidate id | first 7 chars of `github.sha` (no `sha-` prefix) |
+| Image digests | workflow artifacts from internal publish, exported as `TAVI_{API,WEB,WORKER}_DIGEST` |
+
+This path targets namespace `tavi-dev` on the non-prod cluster defaults from
+`infra/k8s/tavi-dev.defaults.env`. It is intentionally separate from the
+immutable release-pin PR used for production promotion. Weekly `refresh-*`
+images are not deployed here.
+
+BSI base-image selection and Xray policy enforcement remain separate migration
+work.
 
 ## Weekly product release
 
