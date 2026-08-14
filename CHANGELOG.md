@@ -4,6 +4,9 @@ This file records the versions released in repository history. Section headings 
 
 ## Unreleased
 
+- After internal Artifactory `sha-*` image publish, automatically deploy those candidates to non-prod `tavi-dev` by SSHing from the `docker-wtg` runner to the jump host and running external `update.sh`.
+- Documented the `tavi-dev` candidate channel and required `TAVI_DEV_SSH_*` repository secrets.
+
 ## 0.9.22 - 2026-06-12 - sha-a229b90
 
 - Included the active workspace Search value in saved-view create and update payloads.
