@@ -4,18 +4,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    ignore:
-      - dependency-name: "@eslint/js"
-        update-types:
-          - version-update:semver-major
-      - dependency-name: typescript
-        update-types:
-          - version-update:semver-major
     groups:
-      npm-minor-patch:
+      npm-all:
         patterns:
           - "*"
         update-types:
+          - major
           - minor
           - patch
 
@@ -24,10 +18,11 @@ updates:
     schedule:
       interval: weekly
     groups:
-      actions-minor-patch:
+      actions-all:
         patterns:
           - "*"
         update-types:
+          - major
           - minor
           - patch
 
@@ -36,10 +31,11 @@ updates:
     schedule:
       interval: weekly
     groups:
-      docker-minor-patch:
+      docker-all:
         patterns:
           - "*"
         update-types:
+          - major
           - minor
           - patch
 
