@@ -86,6 +86,7 @@ Artifactory `sha-<shortsha>` tags (docker metadata short SHA, 7 hex chars).
 | SSH private key | secret `TAVI_DEV_SSH_KEY` |
 | SSH host | secret `TAVI_DEV_SSH_HOST` (for example `sv4d-jump`) |
 | SSH user | secret `TAVI_DEV_SSH_USER` |
+| VKS login passcode | secret `VKS_PASSCODE` (exported on the jump host as `PASSCODE` / `VKS_PASSCODE` for `k8s-login`) |
 | Remote helper path | optional variable `TAVI_DEV_UPDATE_SCRIPT` (default `/e2open/home/mkronvold/src/tavi-dev/update.sh`) |
 | Candidate id | first 7 chars of `github.sha` (no `sha-` prefix) |
 | Image digests | workflow artifacts from internal publish, exported as `TAVI_{API,WEB,WORKER}_DIGEST` |
