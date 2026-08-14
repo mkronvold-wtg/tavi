@@ -17,7 +17,7 @@
     "typecheck": "node ./scripts/sync-version.mjs && tsc --noEmit"
   },
   "devDependencies": {
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.2.0",
     "typescript": "^5.9.3"
   }
 }
