@@ -25,9 +25,10 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.enableShutdownHooks();
-  const fastify = app.getHttpAdapter().getInstance();
 
-  await fastify.register(cookie, {
+  // Register via Nest adapter to avoid Fastify plugin type-provider mismatch
+  // between @fastify/cookie and nested Fastify instance generics (5.11.3+).
+  await app.register(cookie, {
     secret: process.env.COOKIE_SECRET ?? 'tavi-local-dev-secret',
   });
   app.enableCors({
