@@ -196,19 +196,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Verify Artifactory credential
-        shell: bash
-        run: |
-          set -euo pipefail
-          config="$HOME/.docker/config.json"
-          test -r "$config"
-          auth="$(
-            jq -r \
-              --arg registry 'sv4.art.e2open.com' \
-              '(.auths // {})[$registry].auth // empty' \
-              "$config"
-          )"
-          test -n "$auth"
+      - name: Log in to Artifactory
+        uses: docker/login-action@v4
+        with:
+          registry: sv4.art.e2open.com
+          username: ${{ secrets.ARTIFACTORY_USERNAME }}
+          password: ${{ secrets.ARTIFACTORY_RW_TOKEN }}
 
       - name: Set build metadata
         id: build-metadata

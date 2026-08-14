@@ -10,6 +10,9 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+- Split Artifactory credentials into rotatable `ARTIFACTORY_RW_TOKEN` (push via `sv4.art` on `docker-wtg`) and `ARTIFACTORY_RO_TOKEN` (Dependabot pulls on `sv4.art` / `repo.ops` CNAMEs), sharing `ARTIFACTORY_USERNAME`.
+- Fixed main/tag internal publish so a skipped PR-only change-detection job no longer suppresses the Artifactory and `tavi-dev` deploy path.
+- Fixed Dependabot Docker updates for Kubernetes manifests: ignore release-pinned `tavi-*` images and use the read-only Artifactory token for registry auth.
 - After internal Artifactory `sha-*` image publish, automatically deploy those candidates to non-prod `tavi-dev` by SSHing from the `docker-wtg` runner to the jump host and running external `update.sh`.
 - Documented the `tavi-dev` candidate channel and required `TAVI_DEV_SSH_*` repository secrets.
 - Added standardized light and dark workspace themes with aligned application color tokens.

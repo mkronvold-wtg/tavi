@@ -44,20 +44,34 @@ Trusted pushes to the default branch or a version tag (`v*`) build API, web,
 and worker images again on the repository-scoped `docker-wtg` self-hosted
 runner. Those images are published to
 `sv4.art.e2open.com/dcops-docker-repo/tavi-{api,web,worker}` with the same
-`latest`, ref, and SHA tag policy as public images. The runner's host-local
-Docker configuration supplies the Artifactory credential; no registry
-credential is stored in the workflow.
+`latest`, ref, and SHA tag policy as public images. The job logs in with
+repository secrets `ARTIFACTORY_USERNAME` and `ARTIFACTORY_RW_TOKEN` via
+`docker/login-action` so the write credential can be rotated in GitHub without
+touching runner host config. (`sv4.art` and `repo.ops` are CNAME aliases in
+dev; push always targets `sv4.art`.)
 
 The `build-and-publish-internal` job is gated to
 `github.event_name == 'push'` limited to `refs/heads/main` or
-`refs/tags/v*`. Neither `workflow_dispatch` nor any other branch ref can
-reach it; the checkout step is unreachable for those event types. Scheduled
-refreshes enforce the same default-branch guard.
+`refs/tags/v*`, and uses `always()` plus an explicit
+`needs.validate.result == 'success'` check so a skipped PR-only `changes`
+ancestor does not suppress the job on main/tag pushes. Neither
+`workflow_dispatch` nor any other branch ref can reach it. Scheduled
+refreshes enforce the same default-branch guard and the same Artifactory
+login secrets.
 
 The internal matrix is serialized because Tavi currently has one matching
 runner. GitHub-hosted runners continue to build and publish public GHCR
 images, while Kubernetes deployments consume the internal Artifactory service
 through `repo.ops.e2open.com`.
+
+### Dependabot and private app images
+
+Dependabot Docker updates use read-only registries `artifactory-sv4` and
+`artifactory-repo-ops` with Dependabot secrets `ARTIFACTORY_USERNAME` and
+`ARTIFACTORY_RO_TOKEN`. Kubernetes pins for `tavi-api` / `tavi-web` /
+`tavi-worker` remain ignored: those are immutable release pins managed by
+publish/release-pin automation. Public third-party images in those manifests
+(for example `postgres`) still update.
 
 ### Candidate deploy to `tavi-dev`
 
