@@ -424,6 +424,7 @@ jobs:
           TAVI_DEV_SSH_HOST: ${{ secrets.TAVI_DEV_SSH_HOST }}
           TAVI_DEV_SSH_USER: ${{ secrets.TAVI_DEV_SSH_USER }}
           TAVI_DEV_UPDATE_SCRIPT: ${{ vars.TAVI_DEV_UPDATE_SCRIPT }}
+          VKS_PASSCODE: ${{ secrets.VKS_PASSCODE }}
           CANDIDATE_SHA: ${{ steps.candidate.outputs.short_sha }}
           IMAGE_TAG: ${{ steps.candidate.outputs.image_tag }}
         run: |
@@ -432,6 +433,7 @@ jobs:
           : "${TAVI_DEV_SSH_KEY:?Set repository secret TAVI_DEV_SSH_KEY (private key for sv4d-jump)}"
           : "${TAVI_DEV_SSH_HOST:?Set repository secret TAVI_DEV_SSH_HOST (for example sv4d-jump)}"
           : "${TAVI_DEV_SSH_USER:?Set repository secret TAVI_DEV_SSH_USER}"
+          : "${VKS_PASSCODE:?Set repository secret VKS_PASSCODE (k8s-login passcode for stored VKS creds)}"
           update_script="${TAVI_DEV_UPDATE_SCRIPT:-/e2open/home/mkronvold/src/tavi-dev/update.sh}"
 
           api_digest="$(tr -d '[:space:]' < internal-image-digests/internal-api.digest)"
@@ -461,13 +463,15 @@ jobs:
 
           # update.sh expects the short commit id (no sha- prefix). Digests are
           # exported for helpers that can pin repo.ops references by digest.
+          # k8s-login on the jump host decrypts stored VKS credentials with PASSCODE
+          # (VKS_PASSCODE secret). Prefer unattended login before apply.
           ssh \
             -i "${tmp_key}" \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "${TAVI_DEV_SSH_USER}@${TAVI_DEV_SSH_HOST}" \
-            "export TAVI_CANDIDATE_SHA=$(printf '%q' "${CANDIDATE_SHA}") TAVI_IMAGE_TAG=$(printf '%q' "${IMAGE_TAG}") TAVI_API_DIGEST=$(printf '%q' "${api_digest}") TAVI_WEB_DIGEST=$(printf '%q' "${web_digest}") TAVI_WORKER_DIGEST=$(printf '%q' "${worker_digest}") K8S_NAMESPACE=tavi-dev; exec $(printf '%q' "${update_script}") $(printf '%q' "${CANDIDATE_SHA}")"
+            "export PASSCODE=$(printf '%q' "${VKS_PASSCODE}") VKS_PASSCODE=$(printf '%q' "${VKS_PASSCODE}") TAVI_CANDIDATE_SHA=$(printf '%q' "${CANDIDATE_SHA}") TAVI_IMAGE_TAG=$(printf '%q' "${IMAGE_TAG}") TAVI_API_DIGEST=$(printf '%q' "${api_digest}") TAVI_WEB_DIGEST=$(printf '%q' "${web_digest}") TAVI_WORKER_DIGEST=$(printf '%q' "${worker_digest}") K8S_NAMESPACE=tavi-dev; if command -v k8s-login >/dev/null 2>&1; then k8s-login --unattended -c \"\${K8S_CLUSTER:-sv4d-cops-nonp}\" || k8s-login -c \"\${K8S_CLUSTER:-sv4d-cops-nonp}\"; fi; exec $(printf '%q' "${update_script}") $(printf '%q' "${CANDIDATE_SHA}")"
 
   create-release-pin-pull-request:
     name: Create immutable release-pin pull request

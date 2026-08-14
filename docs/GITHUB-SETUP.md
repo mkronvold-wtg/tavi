@@ -106,6 +106,7 @@ After internal Artifactory publish, CI deploys `sha-*` candidates to non-prod
 | `TAVI_DEV_SSH_KEY` | Private key accepted by the jump host for the deploy user |
 | `TAVI_DEV_SSH_HOST` | Jump host hostname (for example `sv4d-jump`) |
 | `TAVI_DEV_SSH_USER` | SSH username on the jump host |
+| `VKS_PASSCODE` | Passcode for jump-host `k8s-login` to decrypt stored VKS/AD credentials (`PASSCODE` env) |
 
 Optional repository variable:
 
