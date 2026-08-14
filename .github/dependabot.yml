@@ -1,14 +1,18 @@
 version: 2
 registries:
-  # Public Artifactory edge used when a Docker dependency is expressed against
-  # sv4.art.e2open.com. Cluster pins may still use repo.ops.e2open.com; those
-  # Tavi app images are release-managed and ignored below because Dependabot
-  # runners cannot resolve the internal ops hostname.
-  artifactory-docker:
+  # sv4.art and repo.ops are CNAME aliases of the same Artifactory edge in dev.
+  # Push uses ARTIFACTORY_RW_TOKEN in Actions; Dependabot only pulls, so it uses
+  # the read-only token. Username is shared (ARTIFACTORY_USERNAME).
+  artifactory-sv4:
     type: docker-registry
     url: https://sv4.art.e2open.com
     username: ${{ secrets.ARTIFACTORY_USERNAME }}
-    password: ${{ secrets.ARTIFACTORY_TOKEN }}
+    password: ${{ secrets.ARTIFACTORY_RO_TOKEN }}
+  artifactory-repo-ops:
+    type: docker-registry
+    url: https://repo.ops.e2open.com
+    username: ${{ secrets.ARTIFACTORY_USERNAME }}
+    password: ${{ secrets.ARTIFACTORY_RO_TOKEN }}
 
 updates:
   - package-ecosystem: npm
@@ -49,7 +53,8 @@ updates:
     schedule:
       interval: weekly
     registries:
-      - artifactory-docker
+      - artifactory-sv4
+      - artifactory-repo-ops
     groups:
       docker-all:
         patterns:
@@ -67,7 +72,8 @@ updates:
     schedule:
       interval: weekly
     registries:
-      - artifactory-docker
+      - artifactory-sv4
+      - artifactory-repo-ops
     ignore:
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
@@ -81,7 +87,8 @@ updates:
     schedule:
       interval: weekly
     registries:
-      - artifactory-docker
+      - artifactory-sv4
+      - artifactory-repo-ops
     ignore:
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
@@ -95,7 +102,8 @@ updates:
     schedule:
       interval: weekly
     registries:
-      - artifactory-docker
+      - artifactory-sv4
+      - artifactory-repo-ops
     ignore:
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
@@ -109,7 +117,8 @@ updates:
     schedule:
       interval: weekly
     registries:
-      - artifactory-docker
+      - artifactory-sv4
+      - artifactory-repo-ops
     ignore:
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"

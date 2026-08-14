@@ -325,7 +325,7 @@ jobs:
         with:
           registry: sv4.art.e2open.com
           username: ${{ secrets.ARTIFACTORY_USERNAME }}
-          password: ${{ secrets.ARTIFACTORY_TOKEN }}
+          password: ${{ secrets.ARTIFACTORY_RW_TOKEN }}
 
       - name: Set build metadata
         id: build-metadata

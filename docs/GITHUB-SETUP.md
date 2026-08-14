@@ -75,22 +75,25 @@ If the repository or packages are private, deployment hosts need permission to p
 
 Use `docker login ghcr.io` for Docker hosts or an image pull secret for Kubernetes clusters.
 
-## Artifactory publish secrets
+## Artifactory registry secrets
 
-Internal image publish jobs on the repository-scoped `docker-wtg` runner log in
-to `sv4.art.e2open.com` with repository secrets (not host-local Docker config):
+In dev, `sv4.art.e2open.com` (push edge) and `repo.ops.e2open.com` (pull / ops
+LB) are CNAME aliases of the same Artifactory. Use separate tokens so publish
+keeps write access while Dependabot and pull paths stay read-only:
 
 | Secret | Purpose |
 | ------ | ------- |
-| `ARTIFACTORY_USERNAME` | Artifactory username (often an email identity) |
-| `ARTIFACTORY_TOKEN` | Artifactory identity/API token with push to `dcops-docker-repo` |
+| `ARTIFACTORY_USERNAME` | Shared Artifactory username (often an email identity) |
+| `ARTIFACTORY_RW_TOKEN` | Write token for `docker-wtg` push to `sv4.art` / `dcops-docker-repo` |
+| `ARTIFACTORY_RO_TOKEN` | Read-only token for Dependabot (and other pull clients) |
 
-Set the same two names as **Dependabot secrets** as well
-(`gh secret set … --app dependabot`) so `.github/dependabot.yml` can use the
-`artifactory-docker` registry when a Docker dependency points at
-`sv4.art.e2open.com`.
+Set the same names as **Dependabot secrets** as well
+(`gh secret set … --app dependabot`). Dependabot registries use
+`ARTIFACTORY_USERNAME` + `ARTIFACTORY_RO_TOKEN` for both `sv4.art` and
+`repo.ops` URLs. Publish/refresh workflows use
+`ARTIFACTORY_USERNAME` + `ARTIFACTORY_RW_TOKEN` on `sv4.art` only.
 
-Rotate the token in GitHub only; workflows pick up the new value on the next run.
+Rotate tokens in GitHub only; workflows pick up the new values on the next run.
 
 ## `tavi-dev` candidate deploy secrets
 

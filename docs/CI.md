@@ -45,9 +45,10 @@ and worker images again on the repository-scoped `docker-wtg` self-hosted
 runner. Those images are published to
 `sv4.art.e2open.com/dcops-docker-repo/tavi-{api,web,worker}` with the same
 `latest`, ref, and SHA tag policy as public images. The job logs in with
-repository secrets `ARTIFACTORY_USERNAME` and `ARTIFACTORY_TOKEN` via
-`docker/login-action` so the credential can be rotated in GitHub without
-touching runner host config.
+repository secrets `ARTIFACTORY_USERNAME` and `ARTIFACTORY_RW_TOKEN` via
+`docker/login-action` so the write credential can be rotated in GitHub without
+touching runner host config. (`sv4.art` and `repo.ops` are CNAME aliases in
+dev; push always targets `sv4.art`.)
 
 The `build-and-publish-internal` job is gated to
 `github.event_name == 'push'` limited to `refs/heads/main` or
@@ -65,13 +66,12 @@ through `repo.ops.e2open.com`.
 
 ### Dependabot and private app images
 
-Dependabot Docker updates may use the `artifactory-docker` registry
-(`sv4.art.e2open.com`) when credentials are present as Dependabot secrets.
-Kubernetes pins for `tavi-api` / `tavi-web` / `tavi-worker` on
-`repo.ops.e2open.com` (and the `sv4.art` equivalents) are ignored: those are
-immutable release pins managed by publish/release-pin automation, and GitHub
-hosted Dependabot cannot resolve the internal `repo.ops` hostname. Public
-third-party images in those manifests (for example `postgres`) still update.
+Dependabot Docker updates use read-only registries `artifactory-sv4` and
+`artifactory-repo-ops` with Dependabot secrets `ARTIFACTORY_USERNAME` and
+`ARTIFACTORY_RO_TOKEN`. Kubernetes pins for `tavi-api` / `tavi-web` /
+`tavi-worker` remain ignored: those are immutable release pins managed by
+publish/release-pin automation. Public third-party images in those manifests
+(for example `postgres`) still update.
 
 ### Candidate deploy to `tavi-dev`
 
