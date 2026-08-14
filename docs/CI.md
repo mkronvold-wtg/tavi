@@ -14,7 +14,9 @@ See [`LCM.md`](./LCM.md) for promotion and rollback, and
 | `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Detects container-relevant PR changes; validates and builds API/web/worker images only when needed, publishing public GHCR images and internal Artifactory images from the trusted `docker-wtg` runner outside PRs. A `v*` tag opens a release-pin PR. |
 | `Scan container images`         | Every PR, `main`, manual dispatch, or a successful refresh | Detects container-relevant PR changes; scans applicable API, web, and worker images with Trivy and uploads High/Critical SARIF findings to GitHub code scanning.                                                                                       |
 | `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans candidate `latest` and timestamped refresh images; also refreshes internal Artifactory images from `docker-wtg`. It does not deploy them.                                                            |
-| `Auto-merge dependency updates` | Dependabot PR events                                       | Approves supported patch/minor npm, GitHub Actions, and Docker updates after required checks succeed. Major updates remain manual.                                                                                                                     |
+| `Cut weekly release`            | Fridays at 13:00 UTC or manual dispatch                    | Opens a version-bump PR from the latest default-branch tip when there is work to release. Patch by default; minor when `CHANGELOG.md` Unreleased contains a marked Features or Breaking section. Enables auto-merge after required checks.           |
+| `Tag release`                   | Push to `main` that lands a `Release x.y.z` commit         | Creates the annotated `v*` tag and GitHub Release notes from the changelog section. The tag push triggers image publish and the release-pin PR.                                                                                                       |
+| `Auto-merge dependency updates` | Dependabot PR events                                       | Approves supported npm, GitHub Actions, and Docker updates of every version type after required checks succeed.                                                                                                                                        |
 
 ## Validation
 
@@ -60,6 +62,22 @@ through `repo.ops.e2open.com`.
 This lane establishes internal publication only. BSI base-image selection and
 Xray policy enforcement remain separate migration work.
 
+## Weekly product release
+
+Dependabot runs on its weekly cadence (typically Monday). The product release is a separate Friday workflow so dependency updates can land and soak before a version cut.
+
+1. `Cut weekly release` runs Friday 13:00 UTC (08:00 CDT / 07:00 CST) or on demand.
+2. [`scripts/cut-release.mjs`](../scripts/cut-release.mjs) inspects commits since the last `Release x.y.z` commit and the `## Unreleased` changelog section.
+3. If there is nothing to ship, the workflow exits successfully without opening a PR.
+4. Otherwise it bumps every workspace `package.json` and `packages/config/src/app-version.ts`, folds Unreleased notes into a dated version section, opens `Release x.y.z`, and enables auto-merge.
+5. After that PR merges, `Tag release` creates `vx.y.z` and a GitHub Release. Existing `Publish container images` tag handling publishes images and opens the immutable release-pin PR.
+
+Bump rule:
+
+- **patch** by default
+- **minor** when Unreleased contains a marked `### Features` or `### Breaking Changes` section
+- major remains manual
+
 ## Image evidence and version promotion
 
 Every published image receives BuildKit SBOM and provenance attestations.
@@ -86,11 +104,21 @@ Trivy scans High and Critical vulnerabilities for locally built candidates on
 pull requests and `main`. After a successful weekly refresh it also scans the
 published GHCR `latest` images. Findings are separated by SARIF category:
 
-| Service | Category       |
-| ------- | -------------- |
-| API     | `trivy-api`    |
-| Web     | `trivy-web`    |
-| Worker  | `trivy-worker` |
+| Service      | Category            |
+| ------------ | ------------------- |
+| API          | `trivy-api`         |
+| Web          | `trivy-web`         |
+| Worker       | `trivy-worker`      |
+| Filesystem   | `trivy-filesystem`  |
+
+Scan jobs write SARIF artifacts only. A final `Upload Trivy code scanning results`
+job downloads every artifact and uploads all categories in one place so GitHub
+code scanning never evaluates a pull request while `trivy-api` / `trivy-web` /
+`trivy-worker` are still in flight (which produced the “configurations not found”
+warning). When image scans are skipped for a non-container PR, that upload job
+sends empty placeholder SARIF for the missing image categories so the same
+configuration set remains present; required `Scan * image` checks and the
+High/Critical enforce step still own the security gate.
 
 Review findings in **GitHub Security > Code scanning alerts**. The workflow
 uses `security-events: write`; remote-image scans also use `packages: read`.

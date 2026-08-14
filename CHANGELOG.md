@@ -2,6 +2,12 @@
 
 This file records the versions released in repository history. Section headings include the version, release commit date, and short release commit SHA currently present in git history.
 
+Weekly automation folds `## Unreleased` into a versioned section every Friday.
+Use optional markers under Unreleased to control the bump:
+
+- `### Features` or `### Breaking Changes` → minor bump
+- otherwise → patch bump
+
 ## Unreleased
 
 - Added standardized light and dark workspace themes with aligned application color tokens.

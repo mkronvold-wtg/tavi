@@ -8,6 +8,18 @@ See [`CI.md`](./CI.md) for validation, SBOM/provenance evidence, and Trivy
 scanning. See [`DOCKER.md`](./DOCKER.md) and
 [`KUBERNETES.md`](./KUBERNETES.md) for deployment procedures.
 
+## Weekly release cut
+
+Product versions are cut on a Friday schedule separate from Dependabot:
+
+1. Monday-oriented dependency updates land through Dependabot and auto-merge.
+2. Friday 13:00 UTC (`Cut weekly release`) opens a version PR from current `main` when there are commits or Unreleased changelog notes since the previous release.
+3. The release PR bumps workspace package versions, folds `CHANGELOG.md` Unreleased entries into `x.y.z`, and auto-merges after required checks.
+4. `Tag release` creates the annotated `vx.y.z` tag and GitHub Release.
+5. The existing publish workflow reacts to the `v*` tag, publishes images, and opens the release-pin PR for Compose/Kubernetes promotion.
+
+Version bump policy: patch by default; minor when Unreleased is marked with `### Features` or `### Breaking Changes`. Major bumps stay manual.
+
 ## Published images and promotion
 
 Tavi publishes three images:
