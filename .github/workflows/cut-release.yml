@@ -1,0 +1,110 @@
+name: Cut weekly release
+
+on:
+  schedule:
+    # Friday 13:00 UTC ≈ 08:00 America/Chicago during CDT, 07:00 during CST.
+    - cron: "0 13 * * 5"
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump strategy
+        required: true
+        default: auto
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+
+concurrency:
+  group: cut-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  cut-release:
+    name: Cut release PR
+    runs-on: ubuntu-latest
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Inspect release candidacy
+        id: inspect
+        env:
+          BUMP: ${{ github.event_name == 'workflow_dispatch' && inputs.bump || 'auto' }}
+        run: |
+          set -euo pipefail
+          node scripts/cut-release.mjs --inspect --bump "$BUMP" | tee inspect.json
+          {
+            echo "skipped=$(jq -r .skipped inspect.json)"
+            echo "reason=$(jq -r .reason inspect.json)"
+            echo "current_version=$(jq -r .current_version inspect.json)"
+            echo "next_version=$(jq -r .next_version inspect.json)"
+            echo "bump=$(jq -r .bump inspect.json)"
+            echo "tag=$(jq -r .tag inspect.json)"
+            echo "branch=$(jq -r .branch inspect.json)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Skip when there is nothing to release
+        if: steps.inspect.outputs.skipped == 'true'
+        run: |
+          echo "${{ steps.inspect.outputs.reason }}"
+
+      - name: Create release branch and commit
+        id: apply
+        if: steps.inspect.outputs.skipped != 'true'
+        env:
+          BUMP: ${{ steps.inspect.outputs.bump }}
+          BRANCH: ${{ steps.inspect.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          node scripts/cut-release.mjs --apply --bump "$BUMP" | tee apply.json
+          {
+            echo "next_version=$(jq -r .next_version apply.json)"
+            echo "tag=$(jq -r .tag apply.json)"
+            echo "branch=$(jq -r .branch apply.json)"
+            echo "short_sha=$(jq -r .short_sha apply.json)"
+            echo "bump=$(jq -r .bump apply.json)"
+          } >> "$GITHUB_OUTPUT"
+          git push --set-upstream origin "$BRANCH"
+
+      - name: Open release pull request
+        id: pr
+        if: steps.inspect.outputs.skipped != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.apply.outputs.next_version }}
+          BRANCH: ${{ steps.apply.outputs.branch }}
+          BUMP: ${{ steps.apply.outputs.bump }}
+          TAG: ${{ steps.apply.outputs.tag }}
+        run: |
+          set -euo pipefail
+          body="$(printf '%s\n' \
+            "## Summary" \
+            "- Cuts release \`${VERSION}\` (\`${BUMP}\` bump) from the latest default-branch tip." \
+            "- Folds \`CHANGELOG.md\` Unreleased notes into the versioned section and bumps workspace package versions." \
+            "- After merge, \`Tag release\` creates \`${TAG}\`, which triggers image publish and the release-pin PR." \
+            "" \
+            "## Schedule" \
+            "- Automatic runs: Fridays at 13:00 UTC (08:00 CDT / 07:00 CST)." \
+            "- Bump rule: patch by default; minor when Unreleased contains a marked Features or Breaking section." \
+          )"
+          url="$(gh pr create \
+            --base "${{ github.event.repository.default_branch }}" \
+            --head "$BRANCH" \
+            --title "Release ${VERSION}" \
+            --body "$body")"
+          number="${url##*/}"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          gh pr merge "$number" --merge --auto
