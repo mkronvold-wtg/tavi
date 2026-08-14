@@ -527,6 +527,7 @@ export class EmailService implements OnModuleInit {
           recipient,
           response,
         }),
+        { cause: error },
       );
     }
   }

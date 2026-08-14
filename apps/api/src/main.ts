@@ -26,10 +26,11 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.enableShutdownHooks();
 
-  // Cast needed: Fastify 5.11.3 plugin generics disagree with Nest's Fastify
-  // adapter register signature for @fastify/cookie.
+  // Cast needed: Fastify 5.x plugin generics disagree with Nest's Fastify
+  // adapter register signature for @fastify/cookie. TS 6 rejects the direct
+  // conversion, so go through unknown.
   await app.register(
-    cookie as Parameters<NestFastifyApplication['register']>[0],
+    cookie as unknown as Parameters<NestFastifyApplication['register']>[0],
     {
       secret: process.env.COOKIE_SECRET ?? 'tavi-local-dev-secret',
     },

@@ -19,6 +19,7 @@
       "@nestjs/platform-fastify>fastify": "5.11.0",
       "postcss": "8.5.26",
       "tar@7.5.16": "7.5.19",
+      "typescript": "~6.0.2",
       "undici@6.26.0": "6.27.0"
     }
   },
@@ -34,6 +35,6 @@
   "devDependencies": {
     "prettier": "^3.9.6",
     "turbo": "^2.10.9",
-    "typescript": "^5.9.3"
+    "typescript": "~6.0.2"
   }
 }
