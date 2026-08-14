@@ -61,6 +61,10 @@ required checks before merging. Confirm that Dependabot security updates are
 enabled in repository settings as well as version updates from
 `.github/dependabot.yml`.
 
+TypeScript major upgrades are ignored in Dependabot until Nest CLI and
+`typescript-eslint` officially support TypeScript 7+. Workspace packages pin
+`typescript` to the 6.0.x line (`~6.0.2`).
+
 ## GHCR package visibility
 
 If the repository or packages are private, deployment hosts need permission to pull:
