@@ -106,7 +106,12 @@ kubectl rollout status deployment/tavi-worker -n tavi
 Use the matching variant path in place of `k8s-with-external-db`. To roll back,
 revert the release-pin commit, reapply the selected variant, and watch the
 same rollout statuses. Candidate `latest` and weekly `refresh-*` images are
-not deployment inputs.
+not deployment inputs for these pinned variants.
+
+Non-prod `tavi-dev` is different: CI auto-rolls Artifactory `sha-*`
+candidates there through the external jump-host `update.sh` helper after each
+internal publish. That channel does not edit these checked-in manifests. See
+[`CI.md`](./CI.md) and [`LCM.md`](./LCM.md).
 
 Docker Compose and public-facing image references use GHCR
 (`ghcr.io/mkronvold-wtg`) and do not require `regcred`.

@@ -36,3 +36,10 @@ Docker Compose because containers do not use them.
 The helper supports `--prepare-only` to validate generated manifests,
 `--write-only` to write them without a Kubernetes operation, and `--apply-only`
 to validate and apply the manifests already written to `tavi-dev`.
+
+CI auto-deploys Artifactory `sha-<shortsha>` candidates to this namespace after
+each successful internal publish on `main` or `v*` tags. The
+`Deploy candidates to tavi-dev` job on the `docker-wtg` runner SSHes to the
+jump host and runs `update.sh <shortsha>`. See [`docs/CI.md`](../../docs/CI.md)
+and [`docs/GITHUB-SETUP.md`](../../docs/GITHUB-SETUP.md). Production still uses
+the immutable release-pin PR path, not this candidate channel.

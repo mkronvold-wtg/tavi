@@ -41,9 +41,29 @@ publishes release-tagged images and opens a release-pin pull request that:
    `imagePullPolicy: IfNotPresent`.
 
 Review and merge that pull request to promote the release. The workflow never
-changes deployment manifests directly. The checked-in initial pin uses the last
-available `sha-*` image because no version-tagged container image existed when
-immutable deployment references were introduced.
+changes checked-in deployment manifests directly. The checked-in initial pin
+uses the last available `sha-*` image because no version-tagged container image
+existed when immutable deployment references were introduced.
+
+## Non-prod candidate channel (`tavi-dev`)
+
+Every trusted internal Artifactory publish that creates `sha-<shortsha>` tags
+also drives an automatic candidate rollout to the non-production `tavi-dev`
+namespace:
+
+1. `build-and-publish-internal` pushes `sv4.art.e2open.com/dcops-docker-repo/tavi-{api,web,worker}:sha-<shortsha>`.
+2. `Deploy candidates to tavi-dev` SSHes from the `docker-wtg` runner to the
+   jump host and runs external `tavi-dev/update.sh <shortsha>`.
+3. The helper rewrites/applies cluster manifests for namespace `tavi-dev`
+   (cluster default `sv4d-cops-nonp` from `infra/k8s/tavi-dev.defaults.env`).
+
+This channel is for continuous dev/test of candidates. It must not replace the
+reviewed `tag@sha256:digest` release-pin path used for production or other
+immutable environments. Rollback in `tavi-dev` means redeploying a prior
+published short SHA with the same helper (or restoring the previous written
+manifests on the jump host).
+
+Required GitHub configuration is listed in [`GITHUB-SETUP.md`](./GITHUB-SETUP.md).
 
 ## Refreshes, base images, and dependencies
 
