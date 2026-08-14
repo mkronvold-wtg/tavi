@@ -9,12 +9,15 @@ on:
     paths:
       - ".dockerignore"
       - ".trivyignore.yaml"
+      - ".github/workflows/cut-release.yml"
       - ".github/workflows/publish-images.yml"
       - ".github/workflows/refresh-images.yml"
+      - ".github/workflows/tag-release.yml"
       - ".github/workflows/trivy-scan.yml"
       - "apps/**"
       - "packages/**"
       - "infra/docker/**"
+      - "scripts/**"
       - "package.json"
       - ".node-version"
       - "pnpm-lock.yaml"
@@ -61,19 +64,36 @@ jobs:
               - ".trivyignore.yaml"
               - ".github/dependabot.yml"
               - ".github/workflows/automerge-dependencies.yml"
+              - ".github/workflows/cut-release.yml"
               - ".github/workflows/publish-images.yml"
               - ".github/workflows/refresh-images.yml"
+              - ".github/workflows/tag-release.yml"
               - ".github/workflows/trivy-scan.yml"
               - "apps/**"
               - "packages/**"
               - "infra/docker/**"
-              - "scripts/update-release-pins.mjs"
+              - "scripts/**"
               - "package.json"
               - ".node-version"
               - "pnpm-lock.yaml"
               - "pnpm-workspace.yaml"
               - "turbo.json"
               - "tsconfig.base.json"
+
+  scan-not-required:
+    name: Scan ${{ matrix.service }} image
+    needs: changes
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.changes.result == 'success' &&
+      needs.changes.outputs.container_inputs != 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api, web, worker]
+    steps:
+      - name: Mark required check successful
+        run: echo "No container-relevant changes; ${{ matrix.service }} image scan not required."
 
   scan-local-images:
     name: Scan ${{ matrix.service }} image
