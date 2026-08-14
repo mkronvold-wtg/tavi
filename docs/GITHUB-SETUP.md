@@ -20,10 +20,17 @@ The image publish workflow uses `GITHUB_TOKEN` with:
 - `id-token: write`
 - `packages: write`
 
-The version-release job additionally needs:
+The version-release / release-pin job additionally needs:
 
 - `contents: write`
 - `pull-requests: write`
+
+The weekly release cut and tag workflows also need:
+
+- `contents: write` (create release branches/tags and GitHub Releases)
+- `pull-requests: write` (open and auto-merge the Friday release PR)
+
+Repository settings must allow GitHub Actions to create and approve pull requests so the Friday release PR can enable auto-merge the same way Dependabot does.
 
 The Trivy scanning workflow uses:
 
