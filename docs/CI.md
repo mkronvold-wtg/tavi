@@ -86,11 +86,21 @@ Trivy scans High and Critical vulnerabilities for locally built candidates on
 pull requests and `main`. After a successful weekly refresh it also scans the
 published GHCR `latest` images. Findings are separated by SARIF category:
 
-| Service | Category       |
-| ------- | -------------- |
-| API     | `trivy-api`    |
-| Web     | `trivy-web`    |
-| Worker  | `trivy-worker` |
+| Service      | Category            |
+| ------------ | ------------------- |
+| API          | `trivy-api`         |
+| Web          | `trivy-web`         |
+| Worker       | `trivy-worker`      |
+| Filesystem   | `trivy-filesystem`  |
+
+Scan jobs write SARIF artifacts only. A final `Upload Trivy code scanning results`
+job downloads every artifact and uploads all categories in one place so GitHub
+code scanning never evaluates a pull request while `trivy-api` / `trivy-web` /
+`trivy-worker` are still in flight (which produced the “configurations not found”
+warning). When image scans are skipped for a non-container PR, that upload job
+sends empty placeholder SARIF for the missing image categories so the same
+configuration set remains present; required `Scan * image` checks and the
+High/Critical enforce step still own the security gate.
 
 Review findings in **GitHub Security > Code scanning alerts**. The workflow
 uses `security-events: write`; remote-image scans also use `packages: read`.
