@@ -19,9 +19,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    # Hold TypeScript majors until Nest CLI and typescript-eslint support TS 7+.
-    # TS 7.0 drops the programmatic compiler API Nest needs and is outside
-    # typescript-eslint's supported peer range (<6.1 today).
     ignore:
       - dependency-name: "typescript"
         update-types:
@@ -48,6 +45,8 @@ updates:
           - minor
           - patch
 
+  # Public lane only: Docker Compose / local dockerhost-home images (Docker Hub,
+  # GHCR). In-cluster Postgres is a BSI pin refreshed by Refresh BSI images.
   - package-ecosystem: docker
     directory: /infra/docker
     schedule:
@@ -64,9 +63,8 @@ updates:
           - minor
           - patch
 
-  # Only track public third-party images in Kubernetes manifests (for example
-  # postgres). Tavi api/web/worker pins are immutable release artifacts updated
-  # by the publish/release-pin path, not Dependabot.
+  # Kubernetes app pins are immutable release artifacts (publish/release-pin).
+  # BSI postgresql is managed by infra/images/bsi-*.pin.json + refresh-bsi-images.
   - package-ecosystem: docker
     directory: /infra/k8s/k8s-with-external-db
     schedule:
@@ -78,9 +76,11 @@ updates:
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "repo.ops.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "sv4.art.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql"
 
   - package-ecosystem: docker
     directory: /infra/k8s/k8s-with-internal-db
@@ -93,9 +93,11 @@ updates:
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "repo.ops.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "sv4.art.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql"
 
   - package-ecosystem: docker
     directory: /infra/k8s/k8s-with-replicas-and-external-db
@@ -108,9 +110,11 @@ updates:
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "repo.ops.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "sv4.art.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql"
 
   - package-ecosystem: docker
     directory: /infra/k8s/k8s-with-replicas-and-internal-ha-db
@@ -123,6 +127,9 @@ updates:
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "repo.ops.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "sv4.art.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql"
+

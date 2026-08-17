@@ -15,18 +15,22 @@ spec:
         app: tavi-postgres
     spec:
       securityContext:
-        fsGroup: 70
+        fsGroup: 1001
+      imagePullSecrets:
+        - name: regcred
       containers:
         - name: postgres
-          image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+          # Internal/BSI lane: Bitnami Secure Image from Artifactory (pull via repo.ops).
+          # Source of truth: infra/images/bsi-postgresql.pin.json (sync with scripts/sync-bsi-pins.mjs).
+          image: repo.ops.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql@sha256:ee3a3613c33fabeb4c8dfb4344fa4293649017c7f07fb4fad5ceb2165ffc37a5
           imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:
               type: RuntimeDefault
             privileged: false
             runAsNonRoot: true
-            runAsUser: 70
-            runAsGroup: 70
+            runAsUser: 1001
+            runAsGroup: 1001
             capabilities:
               drop:
                 - ALL
@@ -42,41 +46,48 @@ spec:
             - containerPort: 5432
               name: postgres
           env:
-            - name: POSTGRES_DB
-              valueFrom:
-                secretKeyRef:
-                  name: tavi-secrets
-                  key: POSTGRES_DB
-            - name: POSTGRES_USER
+            # Bitnami env names; values still come from tavi-secrets POSTGRES_* keys
+            # used by DATABASE_URL for the app.
+            - name: POSTGRESQL_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: tavi-secrets
                   key: POSTGRES_USER
-            - name: POSTGRES_PASSWORD
+            - name: POSTGRESQL_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: tavi-secrets
                   key: POSTGRES_PASSWORD
-            - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: tavi-secrets
+                  key: POSTGRES_DB
+            - name: POSTGRESQL_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tavi-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRESQL_VOLUME_DIR
+              value: /bitnami/postgresql
           volumeMounts:
             - name: postgres-data
-              mountPath: /var/lib/postgresql/data
+              mountPath: /bitnami/postgresql
           readinessProbe:
             exec:
               command:
-                - sh
-                - -c
-                - pg_isready -U "${POSTGRES_USER:-tavi}" -d "${POSTGRES_DB:-tavi}"
-            initialDelaySeconds: 10
+                - bash
+                - -ec
+                - pg_isready -U "$POSTGRESQL_USERNAME" -d "$POSTGRESQL_DATABASE" -h 127.0.0.1
+            initialDelaySeconds: 15
             periodSeconds: 10
           livenessProbe:
             exec:
               command:
-                - sh
-                - -c
-                - pg_isready -U "${POSTGRES_USER:-tavi}" -d "${POSTGRES_DB:-tavi}"
-            initialDelaySeconds: 20
+                - bash
+                - -ec
+                - pg_isready -U "$POSTGRESQL_USERNAME" -d "$POSTGRESQL_DATABASE" -h 127.0.0.1
+            initialDelaySeconds: 30
             periodSeconds: 20
   volumeClaimTemplates:
     - metadata:

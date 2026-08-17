@@ -29,3 +29,7 @@ Thumbs.db
 *~
 
 /backups/
+
+# Local cutover safety copies (never commit)
+.cutover-backups/
+

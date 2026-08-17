@@ -14,6 +14,7 @@ See [`LCM.md`](./LCM.md) for promotion and rollback, and
 | `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Detects container-relevant PR changes; validates and builds API/web/worker images only when needed, publishing public GHCR images and internal Artifactory images from the trusted `docker-wtg` runner outside PRs. After internal `sha-*` publish, deploys those candidates to non-prod `tavi-dev` via jump-host `update.sh`. A `v*` tag also opens a release-pin PR. |
 | `Scan container images`         | Every PR, `main`, manual dispatch, or a successful refresh | Detects container-relevant PR changes; scans applicable API, web, and worker images with Trivy and uploads High/Critical SARIF findings to GitHub code scanning.                                                                                       |
 | `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans candidate `latest` and timestamped refresh images; also refreshes internal Artifactory images from `docker-wtg`. It does not deploy them.                                                            |
+| `Refresh BSI images`            | Mondays 07:23 UTC, push to `main` touching BSI pins, or manual dispatch | Internal lane only: resolves latest Bitnami Secure Image tags from `sv4.art` on `docker-wtg`, updates `infra/images/bsi-*.pin.json`, syncs k8s consumers to `repo.ops` pull refs, opens a pin PR when the candidate moves, and deploys the pin to `tavi-dev` after it lands on `main`. |
 | `Cut weekly release`            | Fridays at 13:00 UTC or manual dispatch                    | Opens a version-bump PR from the latest default-branch tip when there is work to release. Patch by default; minor when `CHANGELOG.md` Unreleased contains a marked Features or Breaking section. Enables auto-merge after required checks.           |
 | `Tag release`                   | Push to `main` that lands a `Release x.y.z` commit         | Creates the annotated `v*` tag and GitHub Release notes from the changelog section. The tag push triggers image publish and the release-pin PR.                                                                                                       |
 | `Auto-merge dependency updates` | Dependabot PR events                                       | Approves supported npm, GitHub Actions, and Docker updates of every version type after required checks succeed.                                                                                                                                        |
@@ -70,8 +71,41 @@ Dependabot Docker updates use read-only registries `artifactory-sv4` and
 `artifactory-repo-ops` with Dependabot secrets `ARTIFACTORY_USERNAME` and
 `ARTIFACTORY_RO_TOKEN`. Kubernetes pins for `tavi-api` / `tavi-web` /
 `tavi-worker` remain ignored: those are immutable release pins managed by
-publish/release-pin automation. Public third-party images in those manifests
-(for example `postgres`) still update.
+publish/release-pin automation.
+
+### Image lanes: public vs internal/BSI
+
+Tavi keeps two parallel image supply chains:
+
+| Lane | Registries | Runners | Used by |
+| ---- | ---------- | ------- | ------- |
+| **Public** | Docker Hub, GHCR | GitHub-hosted, dockerhost-home | Local compose (`infra/docker`), public GHCR app images, Dependabot for compose base images |
+| **Internal / BSI** | `sv4.art` (push/source), `repo.ops` (cluster pull) | `docker-wtg` self-hosted | Artifactory `tavi-{api,web,worker}`, Bitnami Secure Images, `tavi-dev` Kubernetes |
+
+Do not point `tavi-dev` at Docker Hub or GHCR for runtime images.
+
+### BSI PostgreSQL candidates
+
+In-cluster Postgres (internal-db path / tavi-dev) uses Broadcom **Bitnami Secure
+Images** already published into Artifactory, not a mirrored Docker Hub
+`postgres` image.
+
+| Item | Value |
+| ---- | ----- |
+| Source (resolve latest) | `sv4.art.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql:latest` |
+| Pin file | `infra/images/bsi-postgresql.pin.json` |
+| Cluster pull ref | `repo.ops.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql@sha256:…` |
+| Consumer | `infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml` |
+| Sync command | `node scripts/sync-bsi-pins.mjs` |
+| Workflow | `Refresh BSI images` (RO Artifactory login via `ARTIFACTORY_RO_TOKEN`) |
+
+Weekly (and on dispatch) the workflow pulls `:latest` on `docker-wtg`, compares
+the digest to the pin, and opens a PR when Broadcom/BSI refreshes land on
+`sv4.art`. After the pin merges to `main`, the same workflow deploys to
+`tavi-dev` through the jump-host `update.sh` path (with `VKS_PASSCODE`).
+
+Public compose continues to use Docker Hub `postgres:…` pins for
+dockerhost-home / local development.
 
 ### Candidate deploy to `tavi-dev`
 
@@ -96,8 +130,9 @@ This path targets namespace `tavi-dev` on the non-prod cluster defaults from
 immutable release-pin PR used for production promotion. Weekly `refresh-*`
 images are not deployed here.
 
-BSI base-image selection and Xray policy enforcement remain separate migration
-work.
+App images still build from public/GitHub-hosted bases today; expanding BSI base
+images for `tavi-api`/`web`/`worker` Dockerfiles and Xray policy gates remain
+follow-on work. PostgreSQL on tavi-dev is already on the BSI lane.
 
 ## Weekly product release
 

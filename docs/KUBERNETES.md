@@ -116,6 +116,20 @@ internal publish. That channel does not edit these checked-in manifests. See
 Docker Compose and public-facing image references use GHCR
 (`ghcr.io/mkronvold-wtg`) and do not require `regcred`.
 
+In-cluster PostgreSQL for the internal-db / tavi-dev path uses a **Bitnami
+Secure Image** from Artifactory:
+
+`repo.ops.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql@sha256:…`
+
+Pin source of truth: `infra/images/bsi-postgresql.pin.json` (refreshed from
+`sv4.art` `:latest` by `Refresh BSI images`). Sync consumers with
+`node scripts/sync-bsi-pins.mjs`. The StatefulSet uses Bitnami env vars
+(`POSTGRESQL_*`) mapped from `tavi-secrets` `POSTGRES_*` keys, runs as UID
+`1001`, and mounts data at `/bitnami/postgresql`. Switching from Docker Hub
+Postgres may require a fresh PVC (data directory layout differs).
+
+Public compose still uses Docker Hub Postgres for local/dockerhost-home.
+
 Third-party Node, PostgreSQL, and Alpine image inputs are also digest-pinned
 and updated by Dependabot. The CloudNativePG operator bundle remains a
 separately reviewed remote-manifest lifecycle item. See [`LCM.md`](./LCM.md)
