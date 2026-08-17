@@ -24,13 +24,15 @@ on:
       - "infra/images/bsi-*.pin.json"
       - "infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml"
       - "scripts/sync-bsi-pins.mjs"
-      - ".github/workflows/refresh-bsi-images.yml"
-  pull_request:
-    paths:
-      - "infra/images/bsi-*.pin.json"
-      - "infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml"
-      - "scripts/sync-bsi-pins.mjs"
-      - ".github/workflows/refresh-bsi-images.yml"
+            - "scripts/sync-bsi-pins.sh"
+            - ".github/workflows/refresh-bsi-images.yml"
+        pull_request:
+          paths:
+            - "infra/images/bsi-*.pin.json"
+            - "infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml"
+            - "scripts/sync-bsi-pins.mjs"
+            - "scripts/sync-bsi-pins.sh"
+            - ".github/workflows/refresh-bsi-images.yml"
 
 concurrency:
   group: refresh-bsi-${{ github.ref }}
@@ -48,21 +50,24 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .node-version
-
       - name: Rewrite consumers from BSI pin files
-        run: node scripts/sync-bsi-pins.mjs
+              shell: bash
+              run: |
+                set -euo pipefail
+                if ! command -v jq >/dev/null 2>&1; then
+                  sudo apt-get update -qq
+                  sudo apt-get install -y -qq jq
+                fi
+                chmod +x scripts/sync-bsi-pins.sh
+                ./scripts/sync-bsi-pins.sh
 
-      - name: Ensure pin sync is committed
-        run: |
-          if ! git diff --exit-code -- infra/k8s; then
-            echo "::error::Kubernetes BSI pins are out of sync. Run: node scripts/sync-bsi-pins.mjs"
-            git --no-pager diff -- infra/k8s
-            exit 1
-          fi
+            - name: Ensure pin sync is committed
+              run: |
+                if ! git diff --exit-code -- infra/k8s; then
+                  echo "::error::Kubernetes BSI pins are out of sync. Run: ./scripts/sync-bsi-pins.sh"
+                  git --no-pager diff -- infra/k8s
+                  exit 1
+                fi
 
   resolve-latest:
     name: Resolve latest BSI postgresql candidate
@@ -103,72 +108,76 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PIN_FILE=infra/images/bsi-postgresql.pin.json
-          source_image="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.source_image)')"
-          pull_image="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.pull_image)')"
-          tag="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.candidate_tag || "latest")')"
-          current="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.digest)')"
+                if ! command -v jq >/dev/null 2>&1; then
+                  echo "::error::jq is required on docker-wtg for BSI pin resolve"
+                  exit 127
+                fi
+                PIN_FILE=infra/images/bsi-postgresql.pin.json
+                source_image="$(jq -r '.source_image' "${PIN_FILE}")"
+                pull_image="$(jq -r '.pull_image' "${PIN_FILE}")"
+                tag="$(jq -r '.candidate_tag // "latest"' "${PIN_FILE}")"
+                current="$(jq -r '.digest' "${PIN_FILE}")"
 
-          source_ref="${source_image}:${tag}"
-          echo "Pulling candidate ${source_ref}"
-          docker pull "${source_ref}"
+                source_ref="${source_image}:${tag}"
+                echo "Pulling candidate ${source_ref}"
+                docker pull "${source_ref}"
 
-          digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "${source_ref}")"
-          digest="${digest##*@}"
+                digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "${source_ref}")"
+                digest="${digest##*@}"
           if [[ ! "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-            # Some engines only populate Id; resolve via repo digest list.
-            digest="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "${source_ref}" | awk -F@ 'NF==2 {print $2; exit}')"
+                  # Some engines only populate Id; resolve via repo digest list.
+                  digest="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "${source_ref}" | awk -F@ 'NF==2 {print $2; exit}')"
           fi
-          if [[ ! "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-            echo "::error::Could not resolve digest for ${source_ref}"
-            exit 1
-          fi
+                if [[ ! "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+                  echo "::error::Could not resolve digest for ${source_ref}"
+                  exit 1
+                fi
 
-          app_version="$(docker image inspect --format '{{index .Config.Env}}' "${source_ref}" | tr ' ' '\n' | sed -n 's/^APP_VERSION=//p' | head -n1 || true)"
-          if [[ -z "${app_version}" ]]; then
-            app_version="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "${source_ref}" || true)"
-          fi
+                app_version="$(docker image inspect --format '{{index .Config.Env}}' "${source_ref}" | tr ' ' '\n' | sed -n 's/^APP_VERSION=//p' | head -n1 || true)"
+                if [[ -z "${app_version}" ]]; then
+                  app_version="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "${source_ref}" || true)"
+                fi
 
-          pull_ref="${pull_image}@${digest}"
-          source_digest_ref="${source_image}@${digest}"
-          changed=false
-          if [[ "${digest}" != "${current}" ]]; then
-            changed=true
-          fi
+                pull_ref="${pull_image}@${digest}"
+                source_digest_ref="${source_image}@${digest}"
+                changed=false
+                if [[ "${digest}" != "${current}" ]]; then
+                  changed=true
+                fi
 
-          {
-            echo "digest=${digest}"
-            echo "app_version=${app_version}"
-            echo "changed=${changed}"
-            echo "pull_ref=${pull_ref}"
-            echo "source_ref=${source_digest_ref}"
-          } >> "$GITHUB_OUTPUT"
+                {
+                  echo "digest=${digest}"
+                  echo "app_version=${app_version}"
+                  echo "changed=${changed}"
+                  echo "pull_ref=${pull_ref}"
+                  echo "source_ref=${source_digest_ref}"
+                } >> "$GITHUB_OUTPUT"
 
-          echo "current=${current}"
-          echo "latest=${digest}"
-          echo "changed=${changed}"
-          echo "app_version=${app_version}"
+                echo "current=${current}"
+                echo "latest=${digest}"
+                echo "changed=${changed}"
+                echo "app_version=${app_version}"
 
-      - name: Update pin file when candidate moves
-        if: steps.resolve.outputs.changed == 'true'
-        shell: bash
-        env:
-          DIGEST: ${{ steps.resolve.outputs.digest }}
-          APP_VERSION: ${{ steps.resolve.outputs.app_version }}
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const fs = require("fs");
-          const path = "infra/images/bsi-postgresql.pin.json";
-          const pin = JSON.parse(fs.readFileSync(path, "utf8"));
-          pin.digest = process.env.DIGEST;
-          if (process.env.APP_VERSION) {
-            pin.app_version = process.env.APP_VERSION;
-          }
-          fs.writeFileSync(path, `${JSON.stringify(pin, null, 2)}\n`);
-          NODE
-          node scripts/sync-bsi-pins.mjs
-          git --no-pager diff -- infra/images infra/k8s || true
+            - name: Update pin file when candidate moves
+              if: steps.resolve.outputs.changed == 'true'
+              shell: bash
+              env:
+                DIGEST: ${{ steps.resolve.outputs.digest }}
+                APP_VERSION: ${{ steps.resolve.outputs.app_version }}
+              run: |
+                set -euo pipefail
+                PIN_FILE=infra/images/bsi-postgresql.pin.json
+                tmp="$(mktemp)"
+                if [[ -n "${APP_VERSION}" ]]; then
+                  jq --arg d "${DIGEST}" --arg v "${APP_VERSION}" \
+                    '.digest = $d | .app_version = $v' "${PIN_FILE}" > "${tmp}"
+                else
+                  jq --arg d "${DIGEST}" '.digest = $d' "${PIN_FILE}" > "${tmp}"
+                fi
+                mv "${tmp}" "${PIN_FILE}"
+                chmod +x scripts/sync-bsi-pins.sh
+                ./scripts/sync-bsi-pins.sh
+                git --no-pager diff -- infra/images infra/k8s || true
 
       - name: Open PR for BSI candidate bump
         if: >-
@@ -224,11 +233,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pull_ref="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(`${p.pull_image}@${p.digest}`)')"
-          digest="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.digest)')"
-          echo "pull_ref=${pull_ref}" >> "$GITHUB_OUTPUT"
-          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
-          echo "Deploying postgres pin ${pull_ref}"
+                if ! command -v jq >/dev/null 2>&1; then
+                  echo "::error::jq is required on docker-wtg for BSI pin deploy"
+                  exit 127
+                fi
+                PIN_FILE=infra/images/bsi-postgresql.pin.json
+                pull_image="$(jq -r '.pull_image' "${PIN_FILE}")"
+                digest="$(jq -r '.digest' "${PIN_FILE}")"
+                pull_ref="${pull_image}@${digest}"
+                echo "pull_ref=${pull_ref}" >> "$GITHUB_OUTPUT"
+                echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+                echo "Deploying postgres pin ${pull_ref}"
 
       - name: Deploy via jump-host update.sh
         env:
