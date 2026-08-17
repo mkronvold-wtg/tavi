@@ -22,13 +22,13 @@ Use this path when the cluster should run a single PostgreSQL instance for Tavi.
 
 1. A Kubernetes cluster with a default storage class or another `ReadWriteOnce` storage class available.
 2. A compatible ingress controller. The checked-in ingress manifest defaults to `ingressClassName: contour`.
-3. The Tavi GHCR images available to the cluster.
+3. Access to Artifactory via namespace `regcred` for `repo.ops.e2open.com` (app images under `dcops-docker-repo` and BSI Postgres under `bitnami-docker-secure`).
 
 ## Configure
 
 1. Edit `configmap.yaml` and `ingress.yaml` for your public hostname.
 2. Create a real secret from `secret.example.yaml`. The checked-in example points `DATABASE_URL` at `tavi-postgres`.
-3. Adjust the `postgres-statefulset.yaml` storage request if `10Gi` is not appropriate.
+3. Adjust the `postgres-statefulset.yaml` storage request if `10Gi` is not appropriate. Postgres is the Bitnami Secure Image pin from `infra/images/bsi-postgresql.pin.json` (not Docker Hub). First cutover from official Postgres may need the PVC recreated because the data path is `/bitnami/postgresql`.
 4. Update `backup-pvc.yaml` if your cluster needs a different storage class or size. The API and worker share this PVC, so the storage class must support `ReadWriteMany`.
 5. If you need downstream archival or off-cluster replication, customize `backup-post-process-pvc.example.yaml` and `backup-post-process-cronjob.example.yaml`.
 6. If your cluster enforces or supports NetworkPolicy, customize `postgres-network-policy.example.yaml` to allow only the pods that should reach Postgres before applying it.

@@ -1,0 +1,262 @@
+name: Refresh BSI images
+
+# Internal / BSI lane only (Artifactory + docker-wtg + tavi-dev).
+# Public lane (GHCR, Docker Hub, compose, github-hosted / dockerhost-home) is unchanged.
+
+on:
+  schedule:
+    # Pick up Broadcom/BSI refreshes published into sv4.art.
+    - cron: "23 7 * * 1"
+  workflow_dispatch:
+    inputs:
+      deploy_tavi_dev:
+        description: Deploy refreshed BSI postgres pin to tavi-dev after updating the pin
+        type: boolean
+        default: true
+      open_pr_if_changed:
+        description: Open a PR when the candidate digest moves (instead of failing closed)
+        type: boolean
+        default: true
+  push:
+    branches:
+      - main
+    paths:
+      - "infra/images/bsi-*.pin.json"
+      - "infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml"
+      - "scripts/sync-bsi-pins.mjs"
+      - ".github/workflows/refresh-bsi-images.yml"
+  pull_request:
+    paths:
+      - "infra/images/bsi-*.pin.json"
+      - "infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml"
+      - "scripts/sync-bsi-pins.mjs"
+      - ".github/workflows/refresh-bsi-images.yml"
+
+concurrency:
+  group: refresh-bsi-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  sync-check:
+    name: Sync BSI pins into Kubernetes manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - name: Rewrite consumers from BSI pin files
+        run: node scripts/sync-bsi-pins.mjs
+
+      - name: Ensure pin sync is committed
+        run: |
+          if ! git diff --exit-code -- infra/k8s; then
+            echo "::error::Kubernetes BSI pins are out of sync. Run: node scripts/sync-bsi-pins.mjs"
+            git --no-pager diff -- infra/k8s
+            exit 1
+          fi
+
+  resolve-latest:
+    name: Resolve latest BSI postgresql candidate
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: sync-check
+    runs-on:
+      - self-hosted
+      - docker-wtg
+    outputs:
+      digest: ${{ steps.resolve.outputs.digest }}
+      app_version: ${{ steps.resolve.outputs.app_version }}
+      changed: ${{ steps.resolve.outputs.changed }}
+      pull_ref: ${{ steps.resolve.outputs.pull_ref }}
+      source_ref: ${{ steps.resolve.outputs.source_ref }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          # Need a token that can push a branch / open a PR on schedule.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Artifactory (read candidate)
+        uses: docker/login-action@v4
+        with:
+          registry: sv4.art.e2open.com
+          username: ${{ secrets.ARTIFACTORY_USERNAME }}
+          # RO is enough to pull BSI; fall back to RW if only one token is set.
+          password: ${{ secrets.ARTIFACTORY_RO_TOKEN }}
+
+      - name: Resolve latest digest from sv4.art
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          PIN_FILE=infra/images/bsi-postgresql.pin.json
+          source_image="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.source_image)')"
+          pull_image="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.pull_image)')"
+          tag="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.candidate_tag || "latest")')"
+          current="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.digest)')"
+
+          source_ref="${source_image}:${tag}"
+          echo "Pulling candidate ${source_ref}"
+          docker pull "${source_ref}"
+
+          digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "${source_ref}")"
+          digest="${digest##*@}"
+          if [[ ! "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            # Some engines only populate Id; resolve via repo digest list.
+            digest="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "${source_ref}" | awk -F@ 'NF==2 {print $2; exit}')"
+          fi
+          if [[ ! "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "::error::Could not resolve digest for ${source_ref}"
+            exit 1
+          fi
+
+          app_version="$(docker image inspect --format '{{index .Config.Env}}' "${source_ref}" | tr ' ' '\n' | sed -n 's/^APP_VERSION=//p' | head -n1 || true)"
+          if [[ -z "${app_version}" ]]; then
+            app_version="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "${source_ref}" || true)"
+          fi
+
+          pull_ref="${pull_image}@${digest}"
+          source_digest_ref="${source_image}@${digest}"
+          changed=false
+          if [[ "${digest}" != "${current}" ]]; then
+            changed=true
+          fi
+
+          {
+            echo "digest=${digest}"
+            echo "app_version=${app_version}"
+            echo "changed=${changed}"
+            echo "pull_ref=${pull_ref}"
+            echo "source_ref=${source_digest_ref}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "current=${current}"
+          echo "latest=${digest}"
+          echo "changed=${changed}"
+          echo "app_version=${app_version}"
+
+      - name: Update pin file when candidate moves
+        if: steps.resolve.outputs.changed == 'true'
+        shell: bash
+        env:
+          DIGEST: ${{ steps.resolve.outputs.digest }}
+          APP_VERSION: ${{ steps.resolve.outputs.app_version }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("fs");
+          const path = "infra/images/bsi-postgresql.pin.json";
+          const pin = JSON.parse(fs.readFileSync(path, "utf8"));
+          pin.digest = process.env.DIGEST;
+          if (process.env.APP_VERSION) {
+            pin.app_version = process.env.APP_VERSION;
+          }
+          fs.writeFileSync(path, `${JSON.stringify(pin, null, 2)}\n`);
+          NODE
+          node scripts/sync-bsi-pins.mjs
+          git --no-pager diff -- infra/images infra/k8s || true
+
+      - name: Open PR for BSI candidate bump
+        if: >-
+          steps.resolve.outputs.changed == 'true' &&
+          (github.event_name == 'schedule' ||
+            (github.event_name == 'workflow_dispatch' && inputs.open_pr_if_changed))
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/bsi-postgresql-candidate
+          delete-branch: true
+          title: "chore(bsi): refresh postgresql candidate ${{ steps.resolve.outputs.app_version }}"
+          commit-message: |
+            chore(bsi): refresh postgresql candidate
+
+            Digest: ${{ steps.resolve.outputs.digest }}
+            Version: ${{ steps.resolve.outputs.app_version }}
+          body: |
+            ## Summary
+            - Resolved `latest` from `sv4.art.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql`
+            - Pin digest: `${{ steps.resolve.outputs.digest }}`
+            - App version: `${{ steps.resolve.outputs.app_version }}`
+            - Kubernetes consumer rewritten to `repo.ops` pull ref
+
+            ## Notes
+            Internal/BSI lane only. Public compose/GHCR images are unchanged.
+            After merge, `Refresh BSI images` deploys the pin to tavi-dev.
+          add-paths: |
+            infra/images/bsi-postgresql.pin.json
+            infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml
+
+  deploy-tavi-dev:
+    name: Deploy BSI postgres candidate to tavi-dev
+    if: >-
+      always() &&
+      needs.sync-check.result == 'success' &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && inputs.deploy_tavi_dev)
+      )
+    needs:
+      - sync-check
+      - resolve-latest
+    runs-on:
+      - self-hosted
+      - docker-wtg
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Resolve deploy pin
+        id: pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          pull_ref="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(`${p.pull_image}@${p.digest}`)')"
+          digest="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.digest)')"
+          echo "pull_ref=${pull_ref}" >> "$GITHUB_OUTPUT"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          echo "Deploying postgres pin ${pull_ref}"
+
+      - name: Deploy via jump-host update.sh
+        env:
+          SSH_KEY: ${{ secrets.TAVI_DEV_SSH_KEY }}
+          SSH_HOST: ${{ secrets.TAVI_DEV_SSH_HOST }}
+          SSH_USER: ${{ secrets.TAVI_DEV_SSH_USER }}
+          VKS_PASSCODE: ${{ secrets.VKS_PASSCODE }}
+          UPDATE_SCRIPT: ${{ vars.TAVI_DEV_UPDATE_SCRIPT }}
+          CANDIDATE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${SSH_KEY:?Set repository secret TAVI_DEV_SSH_KEY}"
+          : "${SSH_HOST:?Set repository secret TAVI_DEV_SSH_HOST}"
+          : "${SSH_USER:?Set repository secret TAVI_DEV_SSH_USER}"
+          : "${VKS_PASSCODE:?Set repository secret VKS_PASSCODE}"
+          update_script="${UPDATE_SCRIPT:-/e2open/home/mkronvold/src/tavi-dev/update.sh}"
+          # Short sha without sha- prefix — same contract as publish-images deploy.
+          short_sha="$(printf '%s' "${CANDIDATE_SHA}" | cut -c1-7)"
+
+          key_file="$(mktemp)"
+          cleanup() { rm -f "${key_file}"; }
+          trap cleanup EXIT
+          printf '%s\n' "${SSH_KEY}" > "${key_file}"
+          chmod 600 "${key_file}"
+
+          ssh -i "${key_file}" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=accept-new \
+            "${SSH_USER}@${SSH_HOST}" \
+            "export PASSCODE=$(printf '%q' "${VKS_PASSCODE}") VKS_PASSCODE=$(printf '%q' "${VKS_PASSCODE}") TAVI_CANDIDATE_SHA=$(printf '%q' "${short_sha}") K8S_NAMESPACE=tavi-dev; if command -v k8s-login >/dev/null 2>&1; then k8s-login --unattended -c \"\${K8S_CLUSTER:-sv4d-cops-nonp}\" || k8s-login -c \"\${K8S_CLUSTER:-sv4d-cops-nonp}\"; fi; exec $(printf '%q' "${update_script}") $(printf '%q' "${short_sha}")"
