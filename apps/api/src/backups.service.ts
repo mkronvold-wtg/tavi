@@ -969,7 +969,10 @@ export class BackupsService {
     actor: SessionUser,
     snapshot: BackupSnapshot,
   ): Promise<ApplyBackupRestoreResult> {
-    await this.prisma.$transaction(async (tx) => {
+    // Full restores rewrite large view-state tables; default 5s interactive
+    // transaction timeout is too low for production-sized backups.
+    await this.prisma.$transaction(
+      async (tx) => {
       await tx.notificationDeliveryAttempt.deleteMany({});
       await tx.notificationEvent.deleteMany({});
       await tx.importRow.deleteMany({});
@@ -1334,7 +1337,9 @@ export class BackupsService {
           },
         });
       }
-    });
+      },
+      { maxWait: 60_000, timeout: 600_000 },
+    );
 
     const reauthenticateRequired = !this.snapshotHasAdminAccessForActor(
       actor,
