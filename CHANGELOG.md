@@ -10,6 +10,7 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+- Mirror third-party Postgres into Artifactory (`sv4.art` push / `repo.ops` pull) from `infra/images/postgres.Dockerfile`, and point the internal-db StatefulSet at `repo.ops.e2open.com/dcops-docker-repo/postgres` for tavi-dev.
 - Pass jump-host `k8s-login` passcode from repository secret `VKS_PASSCODE` (as `PASSCODE`) during automated `tavi-dev` candidate deploys.
 - Split Artifactory credentials into rotatable `ARTIFACTORY_RW_TOKEN` (push via `sv4.art` on `docker-wtg`) and `ARTIFACTORY_RO_TOKEN` (Dependabot pulls on `sv4.art` / `repo.ops` CNAMEs), sharing `ARTIFACTORY_USERNAME`.
 - Fixed main/tag internal publish so a skipped PR-only change-detection job no longer suppresses the Artifactory and `tavi-dev` deploy path.

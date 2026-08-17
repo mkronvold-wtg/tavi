@@ -116,6 +116,10 @@ internal publish. That channel does not edit these checked-in manifests. See
 Docker Compose and public-facing image references use GHCR
 (`ghcr.io/mkronvold-wtg`) and do not require `regcred`.
 
+In-cluster PostgreSQL for the internal-db variant pulls from Artifactory via
+`repo.ops.e2open.com/dcops-docker-repo/postgres` (mirrored from the public pin in
+`infra/images/postgres.Dockerfile`). See [`CI.md`](./CI.md) third-party mirror.
+
 Third-party Node, PostgreSQL, and Alpine image inputs are also digest-pinned
 and updated by Dependabot. The CloudNativePG operator bundle remains a
 separately reviewed remote-manifest lifecycle item. See [`LCM.md`](./LCM.md)

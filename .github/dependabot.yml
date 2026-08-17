@@ -64,9 +64,26 @@ updates:
           - minor
           - patch
 
-  # Only track public third-party images in Kubernetes manifests (for example
-  # postgres). Tavi api/web/worker pins are immutable release artifacts updated
-  # by the publish/release-pin path, not Dependabot.
+  # Public third-party image source pins (for example postgres). Dependabot
+  # updates infra/images/*.Dockerfile FROM lines; mirror-third-party-images
+  # copies them to Artifactory and sync-third-party-pins.mjs rewrites k8s
+  # consumers to repo.ops.e2open.com/dcops-docker-repo/<name>.
+  - package-ecosystem: docker
+    directory: /infra/images
+    schedule:
+      interval: weekly
+    groups:
+      third-party-images:
+        patterns:
+          - "*"
+        update-types:
+          - major
+          - minor
+          - patch
+
+  # Kubernetes app pins are immutable release artifacts (publish/release-pin).
+  # Third-party images (postgres) are mirrored via infra/images, not updated
+  # here against Artifactory (that would only see already-mirrored tags).
   - package-ecosystem: docker
     directory: /infra/k8s/k8s-with-external-db
     schedule:
@@ -78,9 +95,11 @@ updates:
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/postgres"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/postgres"
 
   - package-ecosystem: docker
     directory: /infra/k8s/k8s-with-internal-db
@@ -93,9 +112,11 @@ updates:
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/postgres"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/postgres"
 
   - package-ecosystem: docker
     directory: /infra/k8s/k8s-with-replicas-and-external-db
@@ -108,9 +129,11 @@ updates:
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/postgres"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/postgres"
 
   - package-ecosystem: docker
     directory: /infra/k8s/k8s-with-replicas-and-internal-ha-db
@@ -123,6 +146,8 @@ updates:
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "repo.ops.e2open.com/dcops-docker-repo/postgres"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-api"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-worker"
+      - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/postgres"

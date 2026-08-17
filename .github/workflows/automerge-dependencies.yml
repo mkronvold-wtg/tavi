@@ -44,6 +44,53 @@ jobs:
           echo "Auto-merging Dependabot update: $UPDATE_TYPE"
           echo "automerge=true" >> "$GITHUB_OUTPUT"
 
+      # Dependabot only edits infra/images/*.Dockerfile. Rewrite k8s consumers to
+      # repo.ops...@digest so the mirror-third-party sync check stays green.
+      - name: Check out Dependabot branch
+        if: >-
+          steps.policy.outputs.automerge == 'true' &&
+          steps.metadata.outputs.package-ecosystem == 'docker'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node
+        if: >-
+          steps.policy.outputs.automerge == 'true' &&
+          steps.metadata.outputs.package-ecosystem == 'docker'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - name: Sync third-party Kubernetes pins
+        if: >-
+          steps.policy.outputs.automerge == 'true' &&
+          steps.metadata.outputs.package-ecosystem == 'docker'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ ! -f scripts/sync-third-party-pins.mjs ]]; then
+            echo "No third-party pin sync script on this branch; skipping"
+            exit 0
+          fi
+          if [[ ! -d infra/images ]]; then
+            echo "No infra/images directory; skipping"
+            exit 0
+          fi
+          node scripts/sync-third-party-pins.mjs
+          if git diff --quiet -- infra/k8s; then
+            echo "Kubernetes third-party pins already match infra/images"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add infra/k8s
+          git commit -m "chore: sync third-party k8s pins from infra/images"
+          git push
+
       - name: Approve dependency update
         if: steps.policy.outputs.automerge == 'true' && github.event.pull_request.draft == false
         env:

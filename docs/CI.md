@@ -14,6 +14,7 @@ See [`LCM.md`](./LCM.md) for promotion and rollback, and
 | `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Detects container-relevant PR changes; validates and builds API/web/worker images only when needed, publishing public GHCR images and internal Artifactory images from the trusted `docker-wtg` runner outside PRs. After internal `sha-*` publish, deploys those candidates to non-prod `tavi-dev` via jump-host `update.sh`. A `v*` tag also opens a release-pin PR. |
 | `Scan container images`         | Every PR, `main`, manual dispatch, or a successful refresh | Detects container-relevant PR changes; scans applicable API, web, and worker images with Trivy and uploads High/Critical SARIF findings to GitHub code scanning.                                                                                       |
 | `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans candidate `latest` and timestamped refresh images; also refreshes internal Artifactory images from `docker-wtg`. It does not deploy them.                                                            |
+| `Mirror third-party images`     | Push to `main` touching `infra/images/**`, Mondays 07:23 UTC, or manual dispatch | Pulls digest-pinned public images from `infra/images/*.Dockerfile`, pushes them to `sv4.art.e2open.com/dcops-docker-repo/<name>`, and requires Kubernetes consumers to use `repo.ops.e2open.com/dcops-docker-repo/<name>` (via `scripts/sync-third-party-pins.mjs`). |
 | `Cut weekly release`            | Fridays at 13:00 UTC or manual dispatch                    | Opens a version-bump PR from the latest default-branch tip when there is work to release. Patch by default; minor when `CHANGELOG.md` Unreleased contains a marked Features or Breaking section. Enables auto-merge after required checks.           |
 | `Tag release`                   | Push to `main` that lands a `Release x.y.z` commit         | Creates the annotated `v*` tag and GitHub Release notes from the changelog section. The tag push triggers image publish and the release-pin PR.                                                                                                       |
 | `Auto-merge dependency updates` | Dependabot PR events                                       | Approves supported npm, GitHub Actions, and Docker updates of every version type after required checks succeed.                                                                                                                                        |
@@ -70,8 +71,37 @@ Dependabot Docker updates use read-only registries `artifactory-sv4` and
 `artifactory-repo-ops` with Dependabot secrets `ARTIFACTORY_USERNAME` and
 `ARTIFACTORY_RO_TOKEN`. Kubernetes pins for `tavi-api` / `tavi-web` /
 `tavi-worker` remain ignored: those are immutable release pins managed by
-publish/release-pin automation. Public third-party images in those manifests
-(for example `postgres`) still update.
+publish/release-pin automation.
+
+### Third-party image mirror (Postgres and similar)
+
+Public third-party runtime images used on-cluster are not pulled from Docker
+Hub by `tavi-dev`. Source of truth is digest-pinned `FROM` lines under
+`infra/images/` (for example `infra/images/postgres.Dockerfile`). Dependabot
+updates that directory weekly.
+
+On merge to `main` (and on a weekly schedule), `Mirror third-party images`
+runs on `docker-wtg`, logs into Artifactory with `ARTIFACTORY_RW_TOKEN`, and
+copies each pin to:
+
+`sv4.art.e2open.com/dcops-docker-repo/<name>:<tag>`
+
+Kubernetes consumers (starting with
+`infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml` for tavi-dev) must
+reference the pull CNAME:
+
+`repo.ops.e2open.com/dcops-docker-repo/<name>:<tag>@sha256:<digest>`
+
+Keep pins synchronized with:
+
+```bash
+node scripts/sync-third-party-pins.mjs
+```
+
+PRs that touch `infra/images/**` fail if the Kubernetes consumers are out of
+sync. Dependabot Docker PRs auto-run `scripts/sync-third-party-pins.mjs` via
+`Auto-merge dependency updates` and push the k8s pin rewrite to the PR branch
+before approve/auto-merge.
 
 ### Candidate deploy to `tavi-dev`
 
