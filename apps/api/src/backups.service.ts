@@ -969,372 +969,378 @@ export class BackupsService {
     actor: SessionUser,
     snapshot: BackupSnapshot,
   ): Promise<ApplyBackupRestoreResult> {
-    await this.prisma.$transaction(async (tx) => {
-      await tx.notificationDeliveryAttempt.deleteMany({});
-      await tx.notificationEvent.deleteMany({});
-      await tx.importRow.deleteMany({});
-      await tx.importJob.deleteMany({});
-      await tx.savedView.deleteMany({});
-      await tx.taskViewState.deleteMany({});
-      await tx.projectViewState.deleteMany({});
-      await tx.auditEvent.deleteMany({});
-      await tx.task.deleteMany({});
-      await tx.project.deleteMany({});
-      await tx.roleAssignment.deleteMany({});
-      await tx.user.deleteMany({});
-      await tx.auditLogRetention.deleteMany({});
-      await tx.$executeRaw(Prisma.sql`DELETE FROM "RetentionSettings"`);
-      await tx.emailSettings.deleteMany({});
-      await tx.backupSettings.deleteMany({});
+    // Full restores rewrite large view-state tables; default 5s interactive
+    // transaction timeout is too low for production-sized backups.
+    await this.prisma.$transaction(
+      async (tx) => {
+        await tx.notificationDeliveryAttempt.deleteMany({});
+        await tx.notificationEvent.deleteMany({});
+        await tx.importRow.deleteMany({});
+        await tx.importJob.deleteMany({});
+        await tx.savedView.deleteMany({});
+        await tx.taskViewState.deleteMany({});
+        await tx.projectViewState.deleteMany({});
+        await tx.auditEvent.deleteMany({});
+        await tx.task.deleteMany({});
+        await tx.project.deleteMany({});
+        await tx.roleAssignment.deleteMany({});
+        await tx.user.deleteMany({});
+        await tx.auditLogRetention.deleteMany({});
+        await tx.$executeRaw(Prisma.sql`DELETE FROM "RetentionSettings"`);
+        await tx.emailSettings.deleteMany({});
+        await tx.backupSettings.deleteMany({});
 
-      for (const user of snapshot.data.users) {
-        await tx.user.create({
-          data: {
-            createdAt: new Date(user.createdAt),
-            dailyDigestEnabled: user.dailyDigestEnabled,
-            dailyDigestTime: readBackupUserDailyDigestTime(user, snapshot),
-            email: user.email,
-            id: user.id,
-            name: user.name,
-            passwordHash: user.passwordHash,
-            personalTodoRetention: user.personalTodoRetention,
-            personalTodoRemindersEnabled: user.personalTodoRemindersEnabled,
-            userConfigJson: user.userConfig
-              ? serializeWorkspaceUserConfig(user.userConfig)
-              : null,
-            updatedAt: new Date(user.updatedAt),
-          },
-        });
-      }
+        for (const user of snapshot.data.users) {
+          await tx.user.create({
+            data: {
+              createdAt: new Date(user.createdAt),
+              dailyDigestEnabled: user.dailyDigestEnabled,
+              dailyDigestTime: readBackupUserDailyDigestTime(user, snapshot),
+              email: user.email,
+              id: user.id,
+              name: user.name,
+              passwordHash: user.passwordHash,
+              personalTodoRetention: user.personalTodoRetention,
+              personalTodoRemindersEnabled: user.personalTodoRemindersEnabled,
+              userConfigJson: user.userConfig
+                ? serializeWorkspaceUserConfig(user.userConfig)
+                : null,
+              updatedAt: new Date(user.updatedAt),
+            },
+          });
+        }
 
-      for (const assignment of snapshot.data.roleAssignments) {
-        await tx.roleAssignment.create({
-          data: {
-            createdAt: new Date(assignment.createdAt),
-            id: assignment.id,
-            role: assignment.role,
-            updatedAt: new Date(assignment.updatedAt),
-            userId: assignment.userId,
-          },
-        });
-      }
+        for (const assignment of snapshot.data.roleAssignments) {
+          await tx.roleAssignment.create({
+            data: {
+              createdAt: new Date(assignment.createdAt),
+              id: assignment.id,
+              role: assignment.role,
+              updatedAt: new Date(assignment.updatedAt),
+              userId: assignment.userId,
+            },
+          });
+        }
 
-      for (const project of snapshot.data.projects) {
-        await tx.project.create({
-          data: {
-            archivedAt: toDateOrNull(project.archivedAt),
-            createdAt: new Date(project.createdAt),
-            derivedStatus: project.derivedStatus,
-            displayStatus: project.displayStatus,
-            dueDate: toDateOrNull(project.dueDate),
-            id: project.id,
-            manualStatus: project.manualStatus,
-            notes: project.notes,
-            ownerUserId: project.ownerUserId,
-            priority: project.priority,
-            references: project.references,
-            sourceExternalId: project.sourceExternalId,
-            sourceSystem: project.sourceSystem,
-            taskBlockedCount: project.taskBlockedCount,
-            taskCanceledCount: project.taskCanceledCount,
-            taskDoneCount: project.taskDoneCount,
-            taskInProgressCount: project.taskInProgressCount,
-            taskOnHoldCount: project.taskOnHoldCount,
-            taskOverdueCount: project.taskOverdueCount,
-            taskTodoCount: project.taskTodoCount,
-            taskTotalCount: project.taskTotalCount,
-            title: project.title,
-            updatedAt: new Date(project.updatedAt),
-          },
-        });
-      }
+        for (const project of snapshot.data.projects) {
+          await tx.project.create({
+            data: {
+              archivedAt: toDateOrNull(project.archivedAt),
+              createdAt: new Date(project.createdAt),
+              derivedStatus: project.derivedStatus,
+              displayStatus: project.displayStatus,
+              dueDate: toDateOrNull(project.dueDate),
+              id: project.id,
+              manualStatus: project.manualStatus,
+              notes: project.notes,
+              ownerUserId: project.ownerUserId,
+              priority: project.priority,
+              references: project.references,
+              sourceExternalId: project.sourceExternalId,
+              sourceSystem: project.sourceSystem,
+              taskBlockedCount: project.taskBlockedCount,
+              taskCanceledCount: project.taskCanceledCount,
+              taskDoneCount: project.taskDoneCount,
+              taskInProgressCount: project.taskInProgressCount,
+              taskOnHoldCount: project.taskOnHoldCount,
+              taskOverdueCount: project.taskOverdueCount,
+              taskTodoCount: project.taskTodoCount,
+              taskTotalCount: project.taskTotalCount,
+              title: project.title,
+              updatedAt: new Date(project.updatedAt),
+            },
+          });
+        }
 
-      for (const task of snapshot.data.tasks) {
-        await tx.task.create({
-          data: {
-            archivedAt: toDateOrNull(task.archivedAt),
-            assigneeUserId: task.assigneeUserId,
-            completedAt: toDateOrNull(task.completedAt),
-            createdAt: new Date(task.createdAt),
-            dueDate: toDateOrNull(task.dueDate),
-            id: task.id,
-            notes: task.notes,
-            priority: task.priority,
-            projectId: task.projectId,
-            sortOrder: task.sortOrder,
-            sourceExternalId: task.sourceExternalId,
-            sourceSystem: task.sourceSystem,
-            status: task.status,
-            title: task.title,
-            updatedAt: new Date(task.updatedAt),
-          },
-        });
-      }
+        for (const task of snapshot.data.tasks) {
+          await tx.task.create({
+            data: {
+              archivedAt: toDateOrNull(task.archivedAt),
+              assigneeUserId: task.assigneeUserId,
+              completedAt: toDateOrNull(task.completedAt),
+              createdAt: new Date(task.createdAt),
+              dueDate: toDateOrNull(task.dueDate),
+              id: task.id,
+              notes: task.notes,
+              priority: task.priority,
+              projectId: task.projectId,
+              sortOrder: task.sortOrder,
+              sourceExternalId: task.sourceExternalId,
+              sourceSystem: task.sourceSystem,
+              status: task.status,
+              title: task.title,
+              updatedAt: new Date(task.updatedAt),
+            },
+          });
+        }
 
-      for (const savedView of snapshot.data.savedViews) {
-        await tx.savedView.create({
-          data: {
-            createdAt: new Date(savedView.createdAt),
-            filtersJson:
-              savedView.filtersJson === null
-                ? Prisma.DbNull
-                : toJsonValue(savedView.filtersJson),
-            groupBy: savedView.groupBy,
-            id: savedView.id,
-            name: savedView.name,
-            search: savedView.search,
-            statusFilter: savedView.statusFilter,
-            updatedAt: new Date(savedView.updatedAt),
-            userId: savedView.userId,
-          },
-        });
-      }
+        for (const savedView of snapshot.data.savedViews) {
+          await tx.savedView.create({
+            data: {
+              createdAt: new Date(savedView.createdAt),
+              filtersJson:
+                savedView.filtersJson === null
+                  ? Prisma.DbNull
+                  : toJsonValue(savedView.filtersJson),
+              groupBy: savedView.groupBy,
+              id: savedView.id,
+              name: savedView.name,
+              search: savedView.search,
+              statusFilter: savedView.statusFilter,
+              updatedAt: new Date(savedView.updatedAt),
+              userId: savedView.userId,
+            },
+          });
+        }
 
-      for (const viewState of snapshot.data.projectViewStates) {
-        await tx.projectViewState.create({
-          data: {
-            createdAt: new Date(viewState.createdAt),
-            id: viewState.id,
-            projectId: viewState.projectId,
-            updatedAt: new Date(viewState.updatedAt),
-            userId: viewState.userId,
-            viewedAt: new Date(viewState.viewedAt),
-          },
-        });
-      }
+        for (const viewState of snapshot.data.projectViewStates) {
+          await tx.projectViewState.create({
+            data: {
+              createdAt: new Date(viewState.createdAt),
+              id: viewState.id,
+              projectId: viewState.projectId,
+              updatedAt: new Date(viewState.updatedAt),
+              userId: viewState.userId,
+              viewedAt: new Date(viewState.viewedAt),
+            },
+          });
+        }
 
-      if (snapshot.data.projectViewStates.length === 0) {
-        const viewedAt = new Date();
+        if (snapshot.data.projectViewStates.length === 0) {
+          const viewedAt = new Date();
 
-        await tx.projectViewState.createMany({
-          data: snapshot.data.users.flatMap((user) =>
-            snapshot.data.projects.map((project) => ({
-              id: `project_view_restore_${user.id}_${project.id}`,
-              projectId: project.id,
-              userId: user.id,
-              viewedAt,
-            })),
-          ),
-        });
-      }
-
-      for (const viewState of snapshot.data.taskViewStates) {
-        await tx.taskViewState.create({
-          data: {
-            createdAt: new Date(viewState.createdAt),
-            id: viewState.id,
-            taskId: viewState.taskId,
-            updatedAt: new Date(viewState.updatedAt),
-            userId: viewState.userId,
-          },
-        });
-      }
-
-      if (snapshot.data.taskViewStates.length === 0) {
-        const activeProjectIds = new Set(
-          snapshot.data.projects
-            .filter((project) => project.archivedAt === null)
-            .map((project) => project.id),
-        );
-
-        await tx.taskViewState.createMany({
-          data: snapshot.data.users.flatMap((user) =>
-            snapshot.data.tasks
-              .filter(
-                (task) =>
-                  task.archivedAt === null &&
-                  activeProjectIds.has(task.projectId),
-              )
-              .map((task) => ({
-                id: `task_view_restore_${user.id}_${task.id}`,
-                taskId: task.id,
+          await tx.projectViewState.createMany({
+            data: snapshot.data.users.flatMap((user) =>
+              snapshot.data.projects.map((project) => ({
+                id: `project_view_restore_${user.id}_${project.id}`,
+                projectId: project.id,
                 userId: user.id,
+                viewedAt,
               })),
-          ),
-          skipDuplicates: true,
-        });
-      }
-
-      for (const job of snapshot.data.importJobs) {
-        await tx.importJob.create({
-          data: {
-            completedAt: toDateOrNull(job.completedAt),
-            createdAt: new Date(job.createdAt),
-            createdByUserId: job.createdByUserId,
-            createdProjectCount: job.createdProjectCount,
-            createdRowCount: job.createdRowCount,
-            createdTaskCount: job.createdTaskCount,
-            failedRowCount: job.failedRowCount,
-            fileName: job.fileName,
-            headers:
-              job.headers === null ? Prisma.DbNull : toJsonValue(job.headers),
-            id: job.id,
-            lastError: job.lastError,
-            mapping:
-              job.mapping === null ? Prisma.DbNull : toJsonValue(job.mapping),
-            skippedRowCount: job.skippedRowCount,
-            sourceContent: job.sourceContent,
-            sourceSystem: job.sourceSystem,
-            status: job.status as ImportJobStatus,
-            suggestedMapping:
-              job.suggestedMapping === null
-                ? Prisma.DbNull
-                : toJsonValue(job.suggestedMapping),
-            totalRowCount: job.totalRowCount,
-            updatedAt: new Date(job.updatedAt),
-            updatedProjectCount: job.updatedProjectCount,
-            updatedRowCount: job.updatedRowCount,
-            updatedTaskCount: job.updatedTaskCount,
-          },
-        });
-      }
-
-      for (const row of snapshot.data.importRows) {
-        await tx.importRow.create({
-          data: {
-            createdAt: new Date(row.createdAt),
-            id: row.id,
-            importId: row.importId,
-            message: row.message,
-            projectId: row.projectId,
-            projectOutcome: row.projectOutcome as ImportRowOutcome,
-            projectOverlapAction:
-              row.projectOverlapAction as ImportOverlapAction,
-            rawData: toJsonValue(row.rawData),
-            rowNumber: row.rowNumber,
-            rowOutcome: row.rowOutcome as ImportRowOutcome,
-            taskId: row.taskId,
-            taskOutcome: row.taskOutcome as ImportRowOutcome,
-            taskOverlapAction: row.taskOverlapAction as ImportOverlapAction,
-            updatedAt: new Date(row.updatedAt),
-            validationErrors:
-              row.validationErrors === null
-                ? Prisma.DbNull
-                : toJsonValue(row.validationErrors),
-          },
-        });
-      }
-
-      for (const event of snapshot.data.auditEvents) {
-        await tx.auditEvent.create({
-          data: {
-            action: event.action,
-            actorEmail: event.actorEmail,
-            actorName: event.actorName,
-            actorRole: event.actorRole,
-            actorUserId: event.actorUserId,
-            createdAt: new Date(event.createdAt),
-            entityId: event.entityId,
-            entityType: event.entityType,
-            id: event.id,
-            metadata:
-              event.metadata === null
-                ? Prisma.DbNull
-                : toJsonValue(event.metadata),
-          },
-        });
-      }
-
-      if (snapshot.data.auditLogRetention) {
-        await tx.auditLogRetention.create({
-          data: {
-            createdAt: new Date(snapshot.data.auditLogRetention.createdAt),
-            id: snapshot.data.auditLogRetention.id,
-            olderThan: snapshot.data.auditLogRetention.olderThan,
-            updatedAt: new Date(snapshot.data.auditLogRetention.updatedAt),
-          },
-        });
-      }
-
-      const retentionSettings = readBackupRetentionSettings(snapshot);
-      await tx.$executeRaw(Prisma.sql`
-        INSERT INTO "RetentionSettings" (
-          "id",
-          "backupRetention",
-          "loginRetention",
-          "changeRetention",
-          "notificationRetention",
-          "createdAt",
-          "updatedAt"
-        )
-        VALUES (
-          ${retentionSettings.id},
-          ${retentionSettings.backupRetention},
-          ${retentionSettings.loginRetention},
-          ${retentionSettings.changeRetention},
-          ${retentionSettings.notificationRetention},
-          ${new Date(retentionSettings.createdAt)},
-          ${new Date(retentionSettings.updatedAt)}
-        )
-      `);
-
-      if (snapshot.data.emailSettings) {
-        await tx.emailSettings.create({
-          data: {
-            createdAt: new Date(snapshot.data.emailSettings.createdAt),
-            dragHandlesEnabled: snapshot.data.emailSettings.dragHandlesEnabled,
-            enabled: snapshot.data.emailSettings.enabled,
-            id: snapshot.data.emailSettings.id,
-            updatedAt: new Date(snapshot.data.emailSettings.updatedAt),
-          },
-        });
-      }
-
-      if (snapshot.data.backupSettings) {
-        await tx.backupSettings.create({
-          data: {
-            createdAt: new Date(snapshot.data.backupSettings.createdAt),
-            enabled: snapshot.data.backupSettings.enabled,
-            id: snapshot.data.backupSettings.id,
-            lastError: snapshot.data.backupSettings.lastError,
-            lastFailureAt: toDateOrNull(
-              snapshot.data.backupSettings.lastFailureAt,
             ),
-            lastScheduledRunAt: toDateOrNull(
-              snapshot.data.backupSettings.lastScheduledRunAt,
-            ),
-            lastSuccessAt: toDateOrNull(
-              snapshot.data.backupSettings.lastSuccessAt,
-            ),
-            scheduleTime: snapshot.data.backupSettings.scheduleTime,
-            updatedAt: new Date(snapshot.data.backupSettings.updatedAt),
-          },
-        });
-      }
+          });
+        }
 
-      for (const event of snapshot.data.notificationEvents) {
-        await tx.notificationEvent.create({
-          data: {
-            attemptCount: event.attemptCount,
-            createdAt: new Date(event.createdAt),
-            dedupeKey: event.dedupeKey,
-            failedAt: toDateOrNull(event.failedAt),
-            id: event.id,
-            kind: event.kind as NotificationKind,
-            lastError: event.lastError,
-            nextAttemptAt: new Date(event.nextAttemptAt),
-            payload: toJsonValue(event.payload),
-            recipientUserId: event.recipientUserId,
-            sentAt: toDateOrNull(event.sentAt),
-            skippedAt: toDateOrNull(event.skippedAt),
-            status: event.status as NotificationStatus,
-            updatedAt: new Date(event.updatedAt),
-          },
-        });
-      }
+        for (const viewState of snapshot.data.taskViewStates) {
+          await tx.taskViewState.create({
+            data: {
+              createdAt: new Date(viewState.createdAt),
+              id: viewState.id,
+              taskId: viewState.taskId,
+              updatedAt: new Date(viewState.updatedAt),
+              userId: viewState.userId,
+            },
+          });
+        }
 
-      for (const attempt of snapshot.data.notificationDeliveryAttempts) {
-        await tx.notificationDeliveryAttempt.create({
-          data: {
-            createdAt: new Date(attempt.createdAt),
-            error: attempt.error,
-            id: attempt.id,
-            notificationId: attempt.notificationId,
-            status: attempt.status as NotificationStatus,
-          },
-        });
-      }
-    });
+        if (snapshot.data.taskViewStates.length === 0) {
+          const activeProjectIds = new Set(
+            snapshot.data.projects
+              .filter((project) => project.archivedAt === null)
+              .map((project) => project.id),
+          );
+
+          await tx.taskViewState.createMany({
+            data: snapshot.data.users.flatMap((user) =>
+              snapshot.data.tasks
+                .filter(
+                  (task) =>
+                    task.archivedAt === null &&
+                    activeProjectIds.has(task.projectId),
+                )
+                .map((task) => ({
+                  id: `task_view_restore_${user.id}_${task.id}`,
+                  taskId: task.id,
+                  userId: user.id,
+                })),
+            ),
+            skipDuplicates: true,
+          });
+        }
+
+        for (const job of snapshot.data.importJobs) {
+          await tx.importJob.create({
+            data: {
+              completedAt: toDateOrNull(job.completedAt),
+              createdAt: new Date(job.createdAt),
+              createdByUserId: job.createdByUserId,
+              createdProjectCount: job.createdProjectCount,
+              createdRowCount: job.createdRowCount,
+              createdTaskCount: job.createdTaskCount,
+              failedRowCount: job.failedRowCount,
+              fileName: job.fileName,
+              headers:
+                job.headers === null ? Prisma.DbNull : toJsonValue(job.headers),
+              id: job.id,
+              lastError: job.lastError,
+              mapping:
+                job.mapping === null ? Prisma.DbNull : toJsonValue(job.mapping),
+              skippedRowCount: job.skippedRowCount,
+              sourceContent: job.sourceContent,
+              sourceSystem: job.sourceSystem,
+              status: job.status as ImportJobStatus,
+              suggestedMapping:
+                job.suggestedMapping === null
+                  ? Prisma.DbNull
+                  : toJsonValue(job.suggestedMapping),
+              totalRowCount: job.totalRowCount,
+              updatedAt: new Date(job.updatedAt),
+              updatedProjectCount: job.updatedProjectCount,
+              updatedRowCount: job.updatedRowCount,
+              updatedTaskCount: job.updatedTaskCount,
+            },
+          });
+        }
+
+        for (const row of snapshot.data.importRows) {
+          await tx.importRow.create({
+            data: {
+              createdAt: new Date(row.createdAt),
+              id: row.id,
+              importId: row.importId,
+              message: row.message,
+              projectId: row.projectId,
+              projectOutcome: row.projectOutcome as ImportRowOutcome,
+              projectOverlapAction:
+                row.projectOverlapAction as ImportOverlapAction,
+              rawData: toJsonValue(row.rawData),
+              rowNumber: row.rowNumber,
+              rowOutcome: row.rowOutcome as ImportRowOutcome,
+              taskId: row.taskId,
+              taskOutcome: row.taskOutcome as ImportRowOutcome,
+              taskOverlapAction: row.taskOverlapAction as ImportOverlapAction,
+              updatedAt: new Date(row.updatedAt),
+              validationErrors:
+                row.validationErrors === null
+                  ? Prisma.DbNull
+                  : toJsonValue(row.validationErrors),
+            },
+          });
+        }
+
+        for (const event of snapshot.data.auditEvents) {
+          await tx.auditEvent.create({
+            data: {
+              action: event.action,
+              actorEmail: event.actorEmail,
+              actorName: event.actorName,
+              actorRole: event.actorRole,
+              actorUserId: event.actorUserId,
+              createdAt: new Date(event.createdAt),
+              entityId: event.entityId,
+              entityType: event.entityType,
+              id: event.id,
+              metadata:
+                event.metadata === null
+                  ? Prisma.DbNull
+                  : toJsonValue(event.metadata),
+            },
+          });
+        }
+
+        if (snapshot.data.auditLogRetention) {
+          await tx.auditLogRetention.create({
+            data: {
+              createdAt: new Date(snapshot.data.auditLogRetention.createdAt),
+              id: snapshot.data.auditLogRetention.id,
+              olderThan: snapshot.data.auditLogRetention.olderThan,
+              updatedAt: new Date(snapshot.data.auditLogRetention.updatedAt),
+            },
+          });
+        }
+
+        const retentionSettings = readBackupRetentionSettings(snapshot);
+        await tx.$executeRaw(Prisma.sql`
+          INSERT INTO "RetentionSettings" (
+            "id",
+            "backupRetention",
+            "loginRetention",
+            "changeRetention",
+            "notificationRetention",
+            "createdAt",
+            "updatedAt"
+          )
+          VALUES (
+            ${retentionSettings.id},
+            ${retentionSettings.backupRetention},
+            ${retentionSettings.loginRetention},
+            ${retentionSettings.changeRetention},
+            ${retentionSettings.notificationRetention},
+            ${new Date(retentionSettings.createdAt)},
+            ${new Date(retentionSettings.updatedAt)}
+          )
+        `);
+
+        if (snapshot.data.emailSettings) {
+          await tx.emailSettings.create({
+            data: {
+              createdAt: new Date(snapshot.data.emailSettings.createdAt),
+              dragHandlesEnabled:
+                snapshot.data.emailSettings.dragHandlesEnabled,
+              enabled: snapshot.data.emailSettings.enabled,
+              id: snapshot.data.emailSettings.id,
+              updatedAt: new Date(snapshot.data.emailSettings.updatedAt),
+            },
+          });
+        }
+
+        if (snapshot.data.backupSettings) {
+          await tx.backupSettings.create({
+            data: {
+              createdAt: new Date(snapshot.data.backupSettings.createdAt),
+              enabled: snapshot.data.backupSettings.enabled,
+              id: snapshot.data.backupSettings.id,
+              lastError: snapshot.data.backupSettings.lastError,
+              lastFailureAt: toDateOrNull(
+                snapshot.data.backupSettings.lastFailureAt,
+              ),
+              lastScheduledRunAt: toDateOrNull(
+                snapshot.data.backupSettings.lastScheduledRunAt,
+              ),
+              lastSuccessAt: toDateOrNull(
+                snapshot.data.backupSettings.lastSuccessAt,
+              ),
+              scheduleTime: snapshot.data.backupSettings.scheduleTime,
+              updatedAt: new Date(snapshot.data.backupSettings.updatedAt),
+            },
+          });
+        }
+
+        for (const event of snapshot.data.notificationEvents) {
+          await tx.notificationEvent.create({
+            data: {
+              attemptCount: event.attemptCount,
+              createdAt: new Date(event.createdAt),
+              dedupeKey: event.dedupeKey,
+              failedAt: toDateOrNull(event.failedAt),
+              id: event.id,
+              kind: event.kind as NotificationKind,
+              lastError: event.lastError,
+              nextAttemptAt: new Date(event.nextAttemptAt),
+              payload: toJsonValue(event.payload),
+              recipientUserId: event.recipientUserId,
+              sentAt: toDateOrNull(event.sentAt),
+              skippedAt: toDateOrNull(event.skippedAt),
+              status: event.status as NotificationStatus,
+              updatedAt: new Date(event.updatedAt),
+            },
+          });
+        }
+
+        for (const attempt of snapshot.data.notificationDeliveryAttempts) {
+          await tx.notificationDeliveryAttempt.create({
+            data: {
+              createdAt: new Date(attempt.createdAt),
+              error: attempt.error,
+              id: attempt.id,
+              notificationId: attempt.notificationId,
+              status: attempt.status as NotificationStatus,
+            },
+          });
+        }
+      },
+      { maxWait: 60_000, timeout: 600_000 },
+    );
 
     const reauthenticateRequired = !this.snapshotHasAdminAccessForActor(
       actor,

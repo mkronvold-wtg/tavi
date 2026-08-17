@@ -16,6 +16,9 @@ spec:
     spec:
       securityContext:
         fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
       imagePullSecrets:
         - name: regcred
       containers:
@@ -70,9 +73,19 @@ spec:
                   key: POSTGRES_PASSWORD
             - name: POSTGRESQL_VOLUME_DIR
               value: /bitnami/postgresql
+            # Prefer SCRAM; BSI defaults to md5 and warns.
+            - name: POSTGRESQL_PASSWORD_ENCRYPTION
+              value: scram-sha-256
           volumeMounts:
             - name: postgres-data
               mountPath: /bitnami/postgresql
+            # BSI image conf/tmp paths are not writable by UID 1001 without mounts.
+            - name: postgresql-conf
+              mountPath: /opt/bitnami/postgresql/conf
+            - name: postgresql-tmp
+              mountPath: /opt/bitnami/postgresql/tmp
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             exec:
               command:
@@ -89,6 +102,13 @@ spec:
                 - pg_isready -U "$POSTGRESQL_USERNAME" -d "$POSTGRESQL_DATABASE" -h 127.0.0.1
             initialDelaySeconds: 30
             periodSeconds: 20
+      volumes:
+        - name: postgresql-conf
+          emptyDir: {}
+        - name: postgresql-tmp
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
   volumeClaimTemplates:
     - metadata:
         name: postgres-data
