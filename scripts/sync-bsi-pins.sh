@@ -56,7 +56,16 @@ replace_first_key_line() {
       }
     }
   ' "${file}" > "${tmp}"
-  mv "${tmp}" "${file}"
+  if cmp -s "${file}" "${tmp}"; then
+    rm -f "${tmp}"
+  else
+    # Equal if only missing final newline on the original.
+    if [[ "$(cat "${tmp}")" == "$(cat "${file}")" ]]; then
+      rm -f "${tmp}"
+    else
+      mv "${tmp}" "${file}"
+    fi
+  fi
 }
 
 rewrite_postgres_statefulset() {
