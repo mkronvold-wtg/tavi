@@ -184,7 +184,7 @@ jobs:
           steps.resolve.outputs.changed == 'true' &&
           (github.event_name == 'schedule' ||
             (github.event_name == 'workflow_dispatch' && inputs.open_pr_if_changed))
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: chore/bsi-postgresql-candidate
