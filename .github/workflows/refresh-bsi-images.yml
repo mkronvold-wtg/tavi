@@ -24,12 +24,14 @@ on:
       - "infra/images/bsi-*.pin.json"
       - "infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml"
       - "scripts/sync-bsi-pins.mjs"
+      - "scripts/sync-bsi-pins.sh"
       - ".github/workflows/refresh-bsi-images.yml"
   pull_request:
     paths:
       - "infra/images/bsi-*.pin.json"
       - "infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml"
       - "scripts/sync-bsi-pins.mjs"
+      - "scripts/sync-bsi-pins.sh"
       - ".github/workflows/refresh-bsi-images.yml"
 
 concurrency:
@@ -48,18 +50,21 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .node-version
-
       - name: Rewrite consumers from BSI pin files
-        run: node scripts/sync-bsi-pins.mjs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq jq
+          fi
+          chmod +x scripts/sync-bsi-pins.sh
+          ./scripts/sync-bsi-pins.sh
 
       - name: Ensure pin sync is committed
         run: |
           if ! git diff --exit-code -- infra/k8s; then
-            echo "::error::Kubernetes BSI pins are out of sync. Run: node scripts/sync-bsi-pins.mjs"
+            echo "::error::Kubernetes BSI pins are out of sync. Run: ./scripts/sync-bsi-pins.sh"
             git --no-pager diff -- infra/k8s
             exit 1
           fi
@@ -103,11 +108,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "::error::jq is required on docker-wtg for BSI pin resolve"
+            exit 127
+          fi
           PIN_FILE=infra/images/bsi-postgresql.pin.json
-          source_image="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.source_image)')"
-          pull_image="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.pull_image)')"
-          tag="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.candidate_tag || "latest")')"
-          current="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.digest)')"
+          source_image="$(jq -r '.source_image' "${PIN_FILE}")"
+          pull_image="$(jq -r '.pull_image' "${PIN_FILE}")"
+          tag="$(jq -r '.candidate_tag // "latest"' "${PIN_FILE}")"
+          current="$(jq -r '.digest' "${PIN_FILE}")"
 
           source_ref="${source_image}:${tag}"
           echo "Pulling candidate ${source_ref}"
@@ -157,17 +166,17 @@ jobs:
           APP_VERSION: ${{ steps.resolve.outputs.app_version }}
         run: |
           set -euo pipefail
-          node <<'NODE'
-          const fs = require("fs");
-          const path = "infra/images/bsi-postgresql.pin.json";
-          const pin = JSON.parse(fs.readFileSync(path, "utf8"));
-          pin.digest = process.env.DIGEST;
-          if (process.env.APP_VERSION) {
-            pin.app_version = process.env.APP_VERSION;
-          }
-          fs.writeFileSync(path, `${JSON.stringify(pin, null, 2)}\n`);
-          NODE
-          node scripts/sync-bsi-pins.mjs
+          PIN_FILE=infra/images/bsi-postgresql.pin.json
+          tmp="$(mktemp)"
+          if [[ -n "${APP_VERSION}" ]]; then
+            jq --arg d "${DIGEST}" --arg v "${APP_VERSION}" \
+              '.digest = $d | .app_version = $v' "${PIN_FILE}" > "${tmp}"
+          else
+            jq --arg d "${DIGEST}" '.digest = $d' "${PIN_FILE}" > "${tmp}"
+          fi
+          mv "${tmp}" "${PIN_FILE}"
+          chmod +x scripts/sync-bsi-pins.sh
+          ./scripts/sync-bsi-pins.sh
           git --no-pager diff -- infra/images infra/k8s || true
 
       - name: Open PR for BSI candidate bump
@@ -175,7 +184,7 @@ jobs:
           steps.resolve.outputs.changed == 'true' &&
           (github.event_name == 'schedule' ||
             (github.event_name == 'workflow_dispatch' && inputs.open_pr_if_changed))
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: chore/bsi-postgresql-candidate
@@ -224,20 +233,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pull_ref="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(`${p.pull_image}@${p.digest}`)')"
-          digest="$(node -e 'const p=require("./infra/images/bsi-postgresql.pin.json"); process.stdout.write(p.digest)')"
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "::error::jq is required on docker-wtg for BSI pin deploy"
+            exit 127
+          fi
+          PIN_FILE=infra/images/bsi-postgresql.pin.json
+          STS_FILE=infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml
+          pull_image="$(jq -r '.pull_image' "${PIN_FILE}")"
+          digest="$(jq -r '.digest' "${PIN_FILE}")"
+          pull_ref="${pull_image}@${digest}"
+          if ! grep -Fq "${pull_ref}" "${STS_FILE}"; then
+            echo "::error::StatefulSet does not contain pin ${pull_ref}; run ./scripts/sync-bsi-pins.sh"
+            exit 1
+          fi
           echo "pull_ref=${pull_ref}" >> "$GITHUB_OUTPUT"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
-          echo "Deploying postgres pin ${pull_ref}"
+          echo "Deploying postgres pin only (app image tags unchanged): ${pull_ref}"
 
-      - name: Deploy via jump-host update.sh
+      - name: Deploy postgres pin only via jump-host
         env:
           SSH_KEY: ${{ secrets.TAVI_DEV_SSH_KEY }}
           SSH_HOST: ${{ secrets.TAVI_DEV_SSH_HOST }}
           SSH_USER: ${{ secrets.TAVI_DEV_SSH_USER }}
           VKS_PASSCODE: ${{ secrets.VKS_PASSCODE }}
-          UPDATE_SCRIPT: ${{ vars.TAVI_DEV_UPDATE_SCRIPT }}
-          CANDIDATE_SHA: ${{ github.sha }}
+          TAVI_DEV_DIR: ${{ vars.TAVI_DEV_DIR }}
+          PULL_REF: ${{ steps.pin.outputs.pull_ref }}
         shell: bash
         run: |
           set -euo pipefail
@@ -245,18 +265,89 @@ jobs:
           : "${SSH_HOST:?Set repository secret TAVI_DEV_SSH_HOST}"
           : "${SSH_USER:?Set repository secret TAVI_DEV_SSH_USER}"
           : "${VKS_PASSCODE:?Set repository secret VKS_PASSCODE}"
-          update_script="${UPDATE_SCRIPT:-/e2open/home/mkronvold/src/tavi-dev/update.sh}"
-          # Short sha without sha- prefix — same contract as publish-images deploy.
-          short_sha="$(printf '%s' "${CANDIDATE_SHA}" | cut -c1-7)"
+          : "${PULL_REF:?missing pin pull_ref}"
+
+          # BSI refresh must not call update.sh with github.sha — that rewrites
+          # api/web/worker tags and races Publish. Apply only postgres STS.
+          namespace="${K8S_NAMESPACE:-tavi-dev}"
+          cluster="${K8S_CLUSTER:-sv4d-cops-nonp}"
+          dev_dir="${TAVI_DEV_DIR:-/e2open/home/mkronvold/src/tavi-dev}"
+          sts_src="infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml"
 
           key_file="$(mktemp)"
-          cleanup() { rm -f "${key_file}"; }
+          sts_prepared="$(mktemp)"
+          remote_script="$(mktemp)"
+          cleanup() { rm -f "${key_file}" "${sts_prepared}" "${remote_script}"; }
           trap cleanup EXIT
+
+          sed -E "s/^([[:space:]]*namespace:[[:space:]]*).+$/\1${namespace}/" \
+            "${sts_src}" > "${sts_prepared}"
+          if ! grep -Fq "${PULL_REF}" "${sts_prepared}"; then
+            echo "::error::Prepared STS missing pin ${PULL_REF}"
+            exit 1
+          fi
+
           printf '%s\n' "${SSH_KEY}" > "${key_file}"
           chmod 600 "${key_file}"
+
+          cat > "${remote_script}" <<'EOS'
+          set -euo pipefail
+          namespace="$1"
+          cluster="$2"
+          dev_dir="$3"
+          pull_ref="$4"
+          sts_b64="$5"
+
+          export PASSCODE="${PASSCODE:-}"
+          if command -v k8s-login >/dev/null 2>&1; then
+            k8s-login --unattended --cluster "${cluster}" \
+              || k8s-login --unattended -c "${cluster}" \
+              || k8s-login -c "${cluster}"
+          fi
+          kubectl config set-context --current --namespace="${namespace}" >/dev/null
+
+          before_api="$(kubectl -n "${namespace}" get deploy tavi-api -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+          before_web="$(kubectl -n "${namespace}" get deploy tavi-web -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+          before_worker="$(kubectl -n "${namespace}" get deploy tavi-worker -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+          echo "app_images_before api=${before_api} web=${before_web} worker=${before_worker}"
+
+          mkdir -p "${dev_dir}"
+          printf '%s' "${sts_b64}" | base64 -d > "${dev_dir}/postgres-statefulset.yaml"
+          echo "Wrote ${dev_dir}/postgres-statefulset.yaml"
+          if ! grep -Fq "${pull_ref}" "${dev_dir}/postgres-statefulset.yaml"; then
+            echo "Jump-host STS missing expected pin ${pull_ref}" >&2
+            exit 1
+          fi
+
+          kubectl apply -f "${dev_dir}/postgres-statefulset.yaml"
+          kubectl rollout status "statefulset/tavi-postgres" -n "${namespace}" --timeout=5m
+
+          after_api="$(kubectl -n "${namespace}" get deploy tavi-api -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+          after_web="$(kubectl -n "${namespace}" get deploy tavi-web -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+          after_worker="$(kubectl -n "${namespace}" get deploy tavi-worker -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+          echo "app_images_after api=${after_api} web=${after_web} worker=${after_worker}"
+
+          if [[ "${before_api}" != "${after_api}" || "${before_web}" != "${after_web}" || "${before_worker}" != "${after_worker}" ]]; then
+            echo "App image tags changed during BSI postgres-only deploy" >&2
+            exit 1
+          fi
+
+          live_pg="$(kubectl -n "${namespace}" get sts tavi-postgres -o jsonpath='{.spec.template.spec.containers[0].image}')"
+          echo "postgres_image=${live_pg}"
+          if [[ "${live_pg}" != "${pull_ref}" ]]; then
+            echo "Live postgres image ${live_pg} does not match pin ${pull_ref}" >&2
+            exit 1
+          fi
+          EOS
+
+          # Drop YAML-indent spaces that leaked into the remote script body.
+          sed -i 's/^          //' "${remote_script}"
+
+          sts_b64="$(base64 -w0 "${sts_prepared}" 2>/dev/null || base64 "${sts_prepared}" | tr -d '\n')"
 
           ssh -i "${key_file}" \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=accept-new \
             "${SSH_USER}@${SSH_HOST}" \
-            "export PASSCODE=$(printf '%q' "${VKS_PASSCODE}") VKS_PASSCODE=$(printf '%q' "${VKS_PASSCODE}") TAVI_CANDIDATE_SHA=$(printf '%q' "${short_sha}") K8S_NAMESPACE=tavi-dev; if command -v k8s-login >/dev/null 2>&1; then k8s-login --unattended -c \"\${K8S_CLUSTER:-sv4d-cops-nonp}\" || k8s-login -c \"\${K8S_CLUSTER:-sv4d-cops-nonp}\"; fi; exec $(printf '%q' "${update_script}") $(printf '%q' "${short_sha}")"
+            "export PASSCODE=$(printf '%q' "${VKS_PASSCODE}"); bash -s -- $(printf '%q' "${namespace}") $(printf '%q' "${cluster}") $(printf '%q' "${dev_dir}") $(printf '%q' "${PULL_REF}") $(printf '%q' "${sts_b64}")" \
+            < "${remote_script}"
