@@ -13,6 +13,13 @@ spec:
       labels:
         app: tavi-web
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       imagePullSecrets:
         - name: regcred
       containers:
@@ -24,8 +31,9 @@ spec:
               type: RuntimeDefault
             privileged: false
             runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
+            runAsUser: 10001
+            runAsGroup: 10001
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
@@ -52,3 +60,9 @@ spec:
                 configMapKeyRef:
                   name: tavi-config
                   key: TAVI_HOME_URL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

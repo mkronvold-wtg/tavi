@@ -13,9 +13,37 @@ spec:
       template:
         spec:
           restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
           containers:
             - name: archive-backups
               image: alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+              securityContext:
+                seccompProfile:
+                  type: RuntimeDefault
+                privileged: false
+                runAsNonRoot: true
+                runAsUser: 10001
+                runAsGroup: 10001
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+                allowPrivilegeEscalation: false
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                  ephemeral-storage: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi
+                  ephemeral-storage: 512Mi
               command: ["/bin/sh", "-lc"]
               args:
                 - |
@@ -30,6 +58,8 @@ spec:
                   readOnly: true
                 - name: archive-target
                   mountPath: /archive
+                - name: tmp
+                  mountPath: /tmp
           volumes:
             - name: source-backups
               persistentVolumeClaim:
@@ -37,3 +67,5 @@ spec:
             - name: archive-target
               persistentVolumeClaim:
                 claimName: tavi-backup-archive
+            - name: tmp
+              emptyDir: {}

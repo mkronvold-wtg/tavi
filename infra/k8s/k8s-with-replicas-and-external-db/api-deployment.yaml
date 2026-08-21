@@ -18,7 +18,12 @@ spec:
         app: tavi-api
     spec:
       securityContext:
-        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
         - name: migrate
           image: repo.ops.e2open.com/dcops-docker-repo/tavi-api:sha-69b0417@sha256:05e049f92154a992e2f033a9967419e5a6611b6983b1f51ae44dad82c61dc376
@@ -28,8 +33,9 @@ spec:
               type: RuntimeDefault
             privileged: false
             runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
+            runAsUser: 10001
+            runAsGroup: 10001
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
@@ -43,6 +49,9 @@ spec:
               cpu: 500m
               ephemeral-storage: 256Mi
               memory: 256Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
           env:
             - name: PORT
@@ -76,8 +85,9 @@ spec:
               type: RuntimeDefault
             privileged: false
             runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
+            runAsUser: 10001
+            runAsGroup: 10001
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
@@ -138,6 +148,8 @@ spec:
           volumeMounts:
             - name: tavi-backups
               mountPath: /var/tavi/backups
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /api/health
@@ -154,3 +166,5 @@ spec:
         - name: tavi-backups
           persistentVolumeClaim:
             claimName: tavi-backups
+        - name: tmp
+          emptyDir: {}

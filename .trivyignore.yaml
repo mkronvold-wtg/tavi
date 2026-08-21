@@ -60,7 +60,34 @@ vulnerabilities:
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
     expired_at: 2026-08-31
 misconfigurations:
+  # Bitnami Secure PostgreSQL image requires UID/GID 1001; cannot raise above 10000.
+  - id: KSV-0020
+    paths:
+      - infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml
+    statement: "Owner: platform. Bitnami BSI PostgreSQL runs as UID 1001 by design."
+    expired_at: 2027-02-28
+  - id: KSV-0021
+    paths:
+      - infra/k8s/k8s-with-internal-db/postgres-statefulset.yaml
+    statement: "Owner: platform. Bitnami BSI PostgreSQL runs as GID 1001 by design."
+    expired_at: 2027-02-28
+  # CloudNativePG PostgreSQL images use UID/GID 26.
+  - id: KSV-0020
+    paths:
+      - infra/k8s/k8s-with-replicas-and-internal-ha-db/postgres-cluster.yaml
+    statement: "Owner: platform. CNPG PostgreSQL images require UID 26."
+    expired_at: 2027-02-28
+  - id: KSV-0021
+    paths:
+      - infra/k8s/k8s-with-replicas-and-internal-ha-db/postgres-cluster.yaml
+    statement: "Owner: platform. CNPG PostgreSQL images require GID 26."
+    expired_at: 2027-02-28
   - id: KSV-01010
+    paths:
+      - infra/k8s/k8s-with-internal-db/configmap.yaml
+      - infra/k8s/k8s-with-external-db/configmap.yaml
+      - infra/k8s/k8s-with-replicas-and-internal-ha-db/configmap.yaml
+      - infra/k8s/k8s-with-replicas-and-external-db/configmap.yaml
     statement: "Owner: platform. ConfigMap tavi-config stores only port numbers and a non-secret sender address (noreply@tavi.local); none of these values are credentials or sensitive data. False positive from key-name pattern matching."
     expired_at: 2027-08-21
 secrets: []
