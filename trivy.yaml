@@ -1,0 +1,5 @@
+# Trivy CLI config. Filesystem misconfiguration scans load extra check data
+# from trivy-data/ so KSV-0125 trusts Tavi's cluster pull registry.
+rego:
+  data:
+    - trivy-data

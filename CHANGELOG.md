@@ -10,6 +10,7 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+- Configured Trivy KSV-0125 to treat `repo.ops.e2open.com` as a trusted registry for Kubernetes image pins.
 - Wrote web `runtime-config.js` to `/tmp` via a build-time dist symlink so Kubernetes `readOnlyRootFilesystem` no longer crash-loops the web container.
 - Pointed Prisma migrate at a baked `/app/schema-engine` binary so `migrate deploy` works without installing the `openssl` CLI (and its HIGH CVE) on a read-only root filesystem.
 
