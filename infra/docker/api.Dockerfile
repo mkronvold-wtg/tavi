@@ -30,24 +30,27 @@ RUN ./node_modules/.bin/prisma generate \
     -o -n "$(find node_modules -type f -path '*/.prisma/client/default.js' | head -n 1)" \
   && test -n "$(find node_modules -name 'schema-engine-debian-openssl-3*' -type f | head -n 1)"
 
-FROM node:26-bookworm-slim@sha256:cd565714d4da3e84bfd341e31448f81d47c6362198f152345297c9c1154e6341 AS runtime
+FROM node:26-trixie-slim@sha256:4ebb5ace66f15a24c14c492e01a8beeed4fddf970a856109f5126e703e5fe503 AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
 ENV TMPDIR=/tmp
 
 # High UID satisfies KSV-0020/0021; keep the existing node username for COPY --chown.
-# libssl3 provides libssl.so.3 for Prisma's schema-engine (slim does not ship it; openssl CLI is not required).
+# libssl3t64 provides libssl.so.3 for Prisma's schema-engine (Trixie slim does
+# not ship it; the bookworm package name libssl3 is not in this suite).
+# apt-get upgrade picks up Debian 13 security updates (util-linux CVE-2026-53612/53614).
 RUN groupmod -g 10001 node \
   && usermod -u 10001 -g 10001 node \
   && apt-get update \
-  && apt-get install -y --no-install-recommends libssl3 \
+  && apt-get upgrade -y --no-install-recommends \
+  && apt-get install -y --no-install-recommends libssl3t64 \
   && rm -rf /var/lib/apt/lists/* \
   && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 # gzip/tar are Essential and libacl1 is a Pre-Depends of coreutils/sed, so
 # apt-get remove refuses or would cascade-remove dpkg. Force-purge only these
-# unused packages after libssl3 is installed. Runtime is node + Prisma
+# unused packages after libssl3t64 is installed. Runtime is node + Prisma
 # schema-engine (libssl.so.3), which do not need gzip/tar/libacl1.
 # CVEs: gzip CVE-2026-41991, libacl1 CVE-2026-54370, tar CVE-2026-18477.
 RUN dpkg --purge --force-remove-essential --force-depends gzip libacl1 tar \
