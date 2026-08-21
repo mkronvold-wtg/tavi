@@ -38,6 +38,10 @@ RUN groupmod -g 10001 node \
 # The runtime executes Node directly; remove the unused npm CLI and its vulnerable transitive packages.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
+# Remove OS utilities not needed at runtime to eliminate associated CVEs
+# (gzip: CVE-2026-41991, libacl1: CVE-2026-54370, tar: CVE-2026-18477).
+RUN apt-get remove --purge -y gzip libacl1 tar && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder --chown=node:node /app/apps/web/dist ./dist
 COPY --from=builder --chown=node:node /app/apps/web/scripts/serve-dist.mjs ./scripts/serve-dist.mjs
 COPY --from=builder --chown=node:node /app/infra/docker/web-entrypoint.sh ./web-entrypoint.sh

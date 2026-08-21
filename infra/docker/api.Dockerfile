@@ -45,6 +45,10 @@ RUN groupmod -g 10001 node \
   && rm -rf /var/lib/apt/lists/* \
   && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
+# Remove OS utilities not needed at runtime to eliminate associated CVEs
+# (tar: CVE-2026-18477, gzip: CVE-2026-41991, libacl1: CVE-2026-54370).
+RUN apt-get remove --purge -y gzip libacl1 tar && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder --chown=node:node /opt/tavi/api ./
 
 USER node
