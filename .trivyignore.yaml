@@ -32,6 +32,9 @@ vulnerabilities:
   - id: CVE-2026-48962
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
     expired_at: 2026-08-31
+  - id: CVE-2026-53613
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream util-linux fixed version; review the base-image digest."
+    expired_at: 2026-09-30
   - id: CVE-2026-53615
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream util-linux fixed version; review the base-image digest."
     expired_at: 2026-08-31
@@ -56,6 +59,9 @@ vulnerabilities:
   - id: CVE-2026-9538
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
     expired_at: 2026-08-31
-misconfigurations: []
+misconfigurations:
+  - id: KSV-01010
+    statement: "Owner: platform. ConfigMap tavi-config stores only port numbers and a non-secret sender address (noreply@tavi.local); none of these values are credentials or sensitive data. False positive from key-name pattern matching."
+    expired_at: 2027-08-21
 secrets: []
 licenses: []
