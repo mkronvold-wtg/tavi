@@ -10,6 +10,7 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+- Time-boxed Trivy ignore for CVE-2013-4392 (`libsystemd0`/`libudev1`; Debian urgency unimportant, systemd+SELinux only).
 - Purged unused `gzip`, `libacl1`, and `tar` from API, web, and worker runtime images to close unfixed Debian CVEs without installing replacements.
 - Time-boxed Trivy ignore for CVE-2026-5928 (`libc6`/`libc-bin` in Node 26 bookworm-slim; no upstream fixed version).
 - Time-boxed Trivy ignore for CVE-2019-1010025 (glibc ASLR-bypass; Debian vendor position is not a vulnerability).
