@@ -45,9 +45,13 @@ RUN groupmod -g 10001 node \
   && rm -rf /var/lib/apt/lists/* \
   && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
-# Remove OS utilities not needed at runtime to eliminate associated CVEs
-# (tar: CVE-2026-18477, gzip: CVE-2026-41991, libacl1: CVE-2026-54370).
-RUN apt-get remove --purge -y gzip libacl1 tar && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+# gzip/tar are Essential and libacl1 is a Pre-Depends of coreutils/sed, so
+# apt-get remove refuses or would cascade-remove dpkg. Force-purge only these
+# unused packages after libssl3 is installed. Runtime is node + Prisma
+# schema-engine (libssl.so.3), which do not need gzip/tar/libacl1.
+# CVEs: gzip CVE-2026-41991, libacl1 CVE-2026-54370, tar CVE-2026-18477.
+RUN dpkg --purge --force-remove-essential --force-depends gzip libacl1 tar \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder --chown=node:node /opt/tavi/api ./
 
