@@ -31,6 +31,10 @@ FROM node:26-bookworm-slim@sha256:cd565714d4da3e84bfd341e31448f81d47c6362198f152
 WORKDIR /app
 ENV NODE_ENV=production
 
+# High UID satisfies KSV-0020/0021; keep the existing node username for COPY --chown.
+RUN groupmod -g 10001 node \
+  && usermod -u 10001 -g 10001 node
+
 # The runtime executes Node directly; remove the unused npm CLI and its vulnerable transitive packages.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
@@ -39,5 +43,8 @@ COPY --from=builder --chown=node:node /app/apps/web/scripts/serve-dist.mjs ./scr
 COPY --from=builder --chown=node:node /app/infra/docker/web-entrypoint.sh ./web-entrypoint.sh
 
 USER node
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:4173').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
 ENTRYPOINT ["sh", "/app/web-entrypoint.sh"]

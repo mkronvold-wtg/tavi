@@ -18,7 +18,12 @@ spec:
         app: tavi-worker
     spec:
       securityContext:
-        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       imagePullSecrets:
         - name: regcred
       containers:
@@ -30,8 +35,9 @@ spec:
               type: RuntimeDefault
             privileged: false
             runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
+            runAsUser: 10001
+            runAsGroup: 10001
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
@@ -82,6 +88,8 @@ spec:
           volumeMounts:
             - name: tavi-backups
               mountPath: /var/tavi/backups
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /health
@@ -98,3 +106,5 @@ spec:
         - name: tavi-backups
           persistentVolumeClaim:
             claimName: tavi-backups
+        - name: tmp
+          emptyDir: {}

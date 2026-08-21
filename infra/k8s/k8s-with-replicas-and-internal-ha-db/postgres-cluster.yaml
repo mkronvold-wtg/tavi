@@ -7,9 +7,12 @@ spec:
   instances: 3
   primaryUpdateStrategy: unsupervised
   podSecurityContext:
+    runAsNonRoot: true
     runAsUser: 26
     runAsGroup: 26
     fsGroup: 26
+    seccompProfile:
+      type: RuntimeDefault
   resources:
     requests:
       cpu: 250m
@@ -24,6 +27,7 @@ spec:
     runAsNonRoot: true
     runAsUser: 26
     runAsGroup: 26
+    readOnlyRootFilesystem: true
     capabilities:
       drop:
         - ALL
