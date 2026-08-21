@@ -195,6 +195,15 @@ High/Critical enforce step still own the security gate.
 Review findings in **GitHub Security > Code scanning alerts**. The workflow
 uses `security-events: write`; remote-image scans also use `packages: read`.
 
+Filesystem misconfiguration scanning uses [`trivy.yaml`](../trivy.yaml) and
+check data under [`trivy-data/`](../trivy-data/). KSV-0125 (restrict images to
+trusted registries) treats `repo.ops.e2open.com` as trusted alongside Trivy's
+built-in Azure Container Registry, Amazon ECR, and Google Container Registry
+suffixes. Kubernetes app and BSI PostgreSQL pins pull from that Artifactory
+host, so they are not untrusted-registry findings. Adding a registry to
+`trivy-data/ksv0125.yaml` replaces the check's default list; keep the existing
+suffixes when extending it.
+
 ### Enforced policy
 
 The scan fails on every High/Critical finding. The minimized, digest-pinned
