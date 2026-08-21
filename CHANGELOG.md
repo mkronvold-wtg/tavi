@@ -14,6 +14,7 @@ Use optional markers under Unreleased to control the bump:
 - Configured Trivy KSV-0125 to treat `repo.ops.e2open.com` as a trusted registry for Kubernetes image pins.
 - Wrote web `runtime-config.js` to `/tmp` via a build-time dist symlink so Kubernetes `readOnlyRootFilesystem` no longer crash-loops the web container.
 - Installed `libssl3` in the API runtime image so Prisma `migrate deploy` can load `schema-engine` (slim has no `libssl.so.3`; the `openssl` CLI is not required).
+- Added a time-boxed Trivy ignore for CVE-2026-6238 (glibc) until Debian bookworm publishes a fixed libc6/libc-bin.
 
 ## 0.9.23 - 2026-08-21 - sha-c0f5c80
 
