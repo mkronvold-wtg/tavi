@@ -44,6 +44,9 @@ vulnerabilities:
   - id: CVE-2026-54369
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libacl1 fixed version; review the base-image digest."
     expired_at: 2026-08-31
+  - id: CVE-2026-5450
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream libc6/libc-bin fixed version (2.36-9+deb12u14); review the base-image digest."
+    expired_at: 2026-09-30
   - id: CVE-2026-57432
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
     expired_at: 2026-08-31
