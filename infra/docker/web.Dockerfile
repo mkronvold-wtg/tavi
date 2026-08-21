@@ -42,6 +42,9 @@ COPY --from=builder --chown=node:node /app/apps/web/dist ./dist
 COPY --from=builder --chown=node:node /app/apps/web/scripts/serve-dist.mjs ./scripts/serve-dist.mjs
 COPY --from=builder --chown=node:node /app/infra/docker/web-entrypoint.sh ./web-entrypoint.sh
 
+# Serve /runtime-config.js from dist while writing the file on /tmp (writable under readOnlyRootFilesystem).
+RUN ln -sfn /tmp/runtime-config.js /app/dist/runtime-config.js
+
 USER node
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \

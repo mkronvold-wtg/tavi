@@ -10,6 +10,9 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+- Wrote web `runtime-config.js` to `/tmp` via a build-time dist symlink so Kubernetes `readOnlyRootFilesystem` no longer crash-loops the web container.
+- Installed `openssl` in the API runtime image so Prisma `migrate deploy` detects `debian-openssl-3.0.x` instead of looking for a missing 1.1 engine.
+
 ## 0.9.23 - 2026-08-21 - sha-c0f5c80
 
 - Run tavi-dev / internal-db Postgres on Bitnami Secure Images from Artifactory (`sv4.art` source / `repo.ops` pull), with `infra/images/bsi-postgresql.pin.json`, `Refresh BSI images` candidate refresh + deploy, while public compose keeps Docker Hub Postgres.

@@ -47,11 +47,13 @@ docker compose \
 ```
 
 The one-shot `migrate` service runs the Prisma migration CLI shipped in the
-minimal API runtime before API and worker start. The API and worker images are
-built with `pnpm deploy` and must regenerate or copy the Prisma client into the
-deployed package after deploy—`@prisma/client` alone is not enough at runtime.
-The web image serves static assets through its built-in Node server and generates
-`runtime-config.js` when the container starts.
+minimal API runtime before API and worker start. The API runtime image includes
+`openssl` so Prisma can detect `debian-openssl-3.0.x` when the container root
+filesystem is read-only. The API and worker images are built with `pnpm deploy`
+and must regenerate or copy the Prisma client into the deployed package after
+deploy—`@prisma/client` alone is not enough at runtime. The web image serves
+static assets through its built-in Node server and writes `runtime-config.js` to
+`/tmp` at start (`/app/dist/runtime-config.js` is a symlink).
 
 Follow the API logs to capture the generated initial admin password for an
 empty local-auth database:
