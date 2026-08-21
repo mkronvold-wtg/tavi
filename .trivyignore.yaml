@@ -65,6 +65,9 @@ vulnerabilities:
   - id: CVE-2026-9538
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
     expired_at: 2026-08-31
+  - id: CVE-2026-6238
+    statement: "Owner: platform. Node 26 bookworm-slim has no upstream glibc (libc6/libc-bin) fixed version; review the base-image digest when a fix is published."
+    expired_at: 2026-11-30
 misconfigurations:
   # Bitnami Secure PostgreSQL image requires UID/GID 1001; cannot raise above 10000.
   - id: KSV-0020
