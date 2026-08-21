@@ -10,6 +10,8 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+- Time-boxed Trivy ignore for CVE-2026-5928 (`libc6`/`libc-bin` in Node 26 bookworm-slim; no upstream fixed version).
+- Time-boxed Trivy ignore for CVE-2019-1010025 (glibc ASLR-bypass; Debian vendor position is not a vulnerability).
 - Time-boxed Trivy ignore for CVE-2026-5450 (`libc6`/`libc-bin` 2.36-9+deb12u14 in Node 26 bookworm-slim; no upstream fixed version).
 - Configured Trivy KSV-0125 to treat `repo.ops.e2open.com` as a trusted registry for Kubernetes image pins.
 - Wrote web `runtime-config.js` to `/tmp` via a build-time dist symlink so Kubernetes `readOnlyRootFilesystem` no longer crash-loops the web container.
