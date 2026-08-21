@@ -45,6 +45,13 @@ COPY --from=builder --chown=node:node /app/infra/docker/web-entrypoint.sh ./web-
 # Serve /runtime-config.js from dist while writing the file on /tmp (writable under readOnlyRootFilesystem).
 RUN ln -sfn /tmp/runtime-config.js /app/dist/runtime-config.js
 
+# gzip/tar are Essential and libacl1 is a Pre-Depends of coreutils/sed, so
+# apt-get remove refuses or would cascade-remove dpkg. Force-purge only these
+# unused packages after the last rootfs mutation. Runtime is sh + node.
+# CVEs: gzip CVE-2026-41991, libacl1 CVE-2026-54370, tar CVE-2026-18477.
+RUN dpkg --purge --force-remove-essential --force-depends gzip libacl1 tar \
+  && rm -rf /var/lib/apt/lists/*
+
 USER node
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
