@@ -28,24 +28,22 @@ WORKDIR /opt/tavi/api
 RUN ./node_modules/.bin/prisma generate \
   && test -f node_modules/.prisma/client/default.js \
     -o -n "$(find node_modules -type f -path '*/.prisma/client/default.js' | head -n 1)" \
-  && ENGINE="$(find node_modules -name 'schema-engine-debian-openssl-3*' -type f | head -n 1)" \
-  && test -n "$ENGINE" \
-  && cp "$ENGINE" /opt/tavi/api/schema-engine \
-  && chmod +x /opt/tavi/api/schema-engine
+  && test -n "$(find node_modules -name 'schema-engine-debian-openssl-3*' -type f | head -n 1)"
 
 FROM node:26-bookworm-slim@sha256:cd565714d4da3e84bfd341e31448f81d47c6362198f152345297c9c1154e6341 AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
-# Skip runtime OpenSSL detection (no openssl CLI on slim; installing it pulled CVE-2026-14456).
-ENV PRISMA_SCHEMA_ENGINE_BINARY=/app/schema-engine
+ENV TMPDIR=/tmp
 
 # High UID satisfies KSV-0020/0021; keep the existing node username for COPY --chown.
+# libssl3 provides libssl.so.3 for Prisma's schema-engine (slim does not ship it; openssl CLI is not required).
 RUN groupmod -g 10001 node \
-  && usermod -u 10001 -g 10001 node
-
-# The runtime executes Node directly; remove the unused npm CLI and its vulnerable transitive packages.
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+  && usermod -u 10001 -g 10001 node \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends libssl3 \
+  && rm -rf /var/lib/apt/lists/* \
+  && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --from=builder --chown=node:node /opt/tavi/api ./
 

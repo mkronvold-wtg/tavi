@@ -47,10 +47,9 @@ docker compose \
 ```
 
 The one-shot `migrate` service runs the Prisma migration CLI shipped in the
-minimal API runtime before API and worker start. The API image copies the
-OpenSSL 3 schema engine to `/app/schema-engine` and sets
-`PRISMA_SCHEMA_ENGINE_BINARY` so migrate does not need the `openssl` CLI on a
-read-only root filesystem. The API and worker images are built with `pnpm deploy`
+minimal API runtime before API and worker start. The API runtime image installs
+`libssl3` (not the `openssl` CLI) so Prisma can detect `debian-openssl-3.0.x` and
+load `schema-engine`. The API and worker images are built with `pnpm deploy`
 and must regenerate or copy the Prisma client into the deployed package after
 deploy—`@prisma/client` alone is not enough at runtime. The web image serves
 static assets through its built-in Node server and writes `runtime-config.js` to
