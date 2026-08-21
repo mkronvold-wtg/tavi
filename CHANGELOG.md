@@ -10,6 +10,8 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+## 0.9.23 - 2026-08-21
+
 - Run tavi-dev / internal-db Postgres on Bitnami Secure Images from Artifactory (`sv4.art` source / `repo.ops` pull), with `infra/images/bsi-postgresql.pin.json`, `Refresh BSI images` candidate refresh + deploy, while public compose keeps Docker Hub Postgres.
 - Pass jump-host `k8s-login` passcode from repository secret `VKS_PASSCODE` (as `PASSCODE`) during automated `tavi-dev` candidate deploys.
 - Split Artifactory credentials into rotatable `ARTIFACTORY_RW_TOKEN` (push via `sv4.art` on `docker-wtg`) and `ARTIFACTORY_RO_TOKEN` (Dependabot pulls on `sv4.art` / `repo.ops` CNAMEs), sharing `ARTIFACTORY_USERNAME`.
