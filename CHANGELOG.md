@@ -11,7 +11,7 @@ Use optional markers under Unreleased to control the bump:
 ## Unreleased
 
 - Wrote web `runtime-config.js` to `/tmp` via a build-time dist symlink so Kubernetes `readOnlyRootFilesystem` no longer crash-loops the web container.
-- Installed `openssl` in the API runtime image so Prisma `migrate deploy` detects `debian-openssl-3.0.x` instead of looking for a missing 1.1 engine.
+- Pointed Prisma migrate at a baked `/app/schema-engine` binary so `migrate deploy` works without installing the `openssl` CLI (and its HIGH CVE) on a read-only root filesystem.
 
 ## 0.9.23 - 2026-08-21 - sha-c0f5c80
 
