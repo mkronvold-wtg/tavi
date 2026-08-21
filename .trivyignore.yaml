@@ -2,6 +2,9 @@
 # an expiration date. Dependabot tracks the pinned base-image digest; remove
 # these entries as soon as an upstream fixed package is available.
 vulnerabilities:
+  - id: CVE-2026-14456
+    statement: "Owner: platform. Prisma schema-engine is dynamically linked to libssl.so.3; bookworm libssl3 3.0.20-1~deb12u2 has no fixed version. Do not install the openssl CLI package."
+    expired_at: 2026-09-30
   - id: CVE-2023-45853
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream zlib1g fixed version; review the base-image digest."
     expired_at: 2026-08-31
