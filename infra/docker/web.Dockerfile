@@ -26,14 +26,18 @@ RUN pnpm --filter @tavi/config build \
   && pnpm --filter @tavi/schemas build \
   && pnpm --filter @tavi/web build
 
-FROM node:26-bookworm-slim@sha256:cd565714d4da3e84bfd341e31448f81d47c6362198f152345297c9c1154e6341 AS runtime
+FROM node:26-trixie-slim@sha256:4ebb5ace66f15a24c14c492e01a8beeed4fddf970a856109f5126e703e5fe503 AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
 
 # High UID satisfies KSV-0020/0021; keep the existing node username for COPY --chown.
+# apt-get upgrade picks up Debian 13 security updates (util-linux CVE-2026-53612/53614).
 RUN groupmod -g 10001 node \
-  && usermod -u 10001 -g 10001 node
+  && usermod -u 10001 -g 10001 node \
+  && apt-get update \
+  && apt-get upgrade -y --no-install-recommends \
+  && rm -rf /var/lib/apt/lists/*
 
 # The runtime executes Node directly; remove the unused npm CLI and its vulnerable transitive packages.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
