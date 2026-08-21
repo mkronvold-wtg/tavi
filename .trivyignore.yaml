@@ -82,14 +82,13 @@ misconfigurations:
       - infra/k8s/k8s-with-replicas-and-internal-ha-db/postgres-cluster.yaml
     statement: "Owner: platform. CNPG PostgreSQL images require GID 26."
     expired_at: 2027-02-28
-  # Trivy flags non-secret config keys (ports, SMTP_FROM) as sensitive; values are not credentials.
   - id: KSV-01010
     paths:
       - infra/k8s/k8s-with-internal-db/configmap.yaml
       - infra/k8s/k8s-with-external-db/configmap.yaml
       - infra/k8s/k8s-with-replicas-and-internal-ha-db/configmap.yaml
       - infra/k8s/k8s-with-replicas-and-external-db/configmap.yaml
-    statement: "Owner: platform. ConfigMap holds non-secret ports/URLs/from-address only; secrets live in tavi-secrets."
-    expired_at: 2027-02-28
+    statement: "Owner: platform. ConfigMap tavi-config stores only port numbers and a non-secret sender address (noreply@tavi.local); none of these values are credentials or sensitive data. False positive from key-name pattern matching."
+    expired_at: 2027-08-21
 secrets: []
 licenses: []
