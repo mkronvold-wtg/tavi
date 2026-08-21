@@ -1,0 +1,35 @@
+# Custom data for Trivy KSV-0125 (uses_untrusted_registry).
+# Providing ksv0125.trusted_registries replaces Trivy's built-in list, so keep
+# the original Azure/ECR/GCR suffixes and add Tavi's Kubernetes pull registry.
+ksv0125:
+  trusted_registries:
+    - repo.ops.e2open.com
+    - azurecr.io
+    - gcr.io
+    - us.gcr.io
+    - eu.gcr.io
+    - asia.gcr.io
+    - ecr.us-east-2.amazonaws.com
+    - ecr.us-east-1.amazonaws.com
+    - ecr.us-west-1.amazonaws.com
+    - ecr.us-west-2.amazonaws.com
+    - ecr.af-south-1.amazonaws.com
+    - ecr.ap-east-1.amazonaws.com
+    - ecr.ap-south-1.amazonaws.com
+    - ecr.ap-northeast-2.amazonaws.com
+    - ecr.ap-southeast-1.amazonaws.com
+    - ecr.ap-southeast-2.amazonaws.com
+    - ecr.ap-northeast-1.amazonaws.com
+    - ecr.ca-central-1.amazonaws.com
+    - ecr.cn-north-1.amazonaws.com.cn
+    - ecr.cn-northwest-1.amazonaws.com.cn
+    - ecr.eu-central-1.amazonaws.com
+    - ecr.eu-west-1.amazonaws.com
+    - ecr.eu-west-2.amazonaws.com
+    - ecr.eu-south-1.amazonaws.com
+    - ecr.eu-west-3.amazonaws.com
+    - ecr.eu-north-1.amazonaws.com
+    - ecr.me-south-1.amazonaws.com
+    - ecr.sa-east-1.amazonaws.com
+    - ecr.us-gov-east-1.amazonaws.com
+    - ecr.us-gov-west-1.amazonaws.com

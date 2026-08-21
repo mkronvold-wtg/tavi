@@ -9,6 +9,8 @@ on:
     paths:
       - ".dockerignore"
       - ".trivyignore.yaml"
+      - "trivy.yaml"
+      - "trivy-data/**"
       - ".github/workflows/cut-release.yml"
       - ".github/workflows/publish-images.yml"
       - ".github/workflows/refresh-images.yml"
@@ -180,6 +182,7 @@ jobs:
           severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
           limit-severities-for-sarif: "true"
           scanners: misconfig,secret
+          trivy-config: trivy.yaml
           trivyignores: .trivyignore.yaml
           exit-code: "0"
 
