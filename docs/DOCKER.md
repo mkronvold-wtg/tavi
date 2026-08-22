@@ -47,13 +47,16 @@ docker compose \
 ```
 
 The one-shot `migrate` service runs the Prisma migration CLI shipped in the
-minimal API runtime before API and worker start. The API runtime image installs
-`libssl3` (not the `openssl` CLI) so Prisma can detect `debian-openssl-3.0.x` and
-load `schema-engine`. The API and worker images are built with `pnpm deploy`
-and must regenerate or copy the Prisma client into the deployed package after
-deploy—`@prisma/client` alone is not enough at runtime. The web image serves
-static assets through its built-in Node server and writes `runtime-config.js` to
-`/tmp` at start (`/app/dist/runtime-config.js` is a symlink).
+minimal API runtime before API and worker start. Invoke it with
+`node node_modules/prisma/build/index.js migrate deploy` — the stock npm
+shim calls `sed`, which needs `libacl1` that Trixie runtimes purge. The API
+runtime image installs `libssl3t64` (not the `openssl` CLI) so Prisma can
+detect `debian-openssl-3.0.x` and load `schema-engine`. The API and worker
+images are built with `pnpm deploy` and must regenerate or copy the Prisma
+client into the deployed package after deploy—`@prisma/client` alone is not
+enough at runtime. The web image serves static assets through its built-in
+Node server and writes `runtime-config.js` to `/tmp` at start
+(`/app/dist/runtime-config.js` is a symlink).
 
 Follow the API logs to capture the generated initial admin password for an
 empty local-auth database:
@@ -108,7 +111,7 @@ docker run --rm \
   --network tavi-net \
   -e DATABASE_URL="$TAVI_DATABASE_URL" \
   "$TAVI_API_IMAGE" \
-  ./node_modules/.bin/prisma migrate deploy
+  node node_modules/prisma/build/index.js migrate deploy
 ```
 
 ## Helper scripts

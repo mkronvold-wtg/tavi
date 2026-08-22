@@ -10,6 +10,7 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+- Fixed Prisma `migrate deploy` on Trixie API images: the npm CLI shim needs `sed`/`libacl1` (purged for CVE-2026-54370). Invoke the CLI with `node` and replace the shim so compose/k8s migrate no longer require libacl.
 - Upgraded API, web, and worker runtime images from `node:26-bookworm-slim` to digest-pinned `node:26-trixie-slim`, installing `libssl3t64` for Prisma schema-engine and applying Debian 13 security updates for util-linux (CVE-2026-53612, CVE-2026-53614).
 - Time-boxed Trivy ignore for CVE-2026-16742 (`libsystemd0`/`libudev1` in Node 26 bookworm-slim; no Debian bookworm fixed version).
 - Time-boxed Trivy ignore for CVE-2026-6368 (`libc6`/`libc-bin` in Node 26 bookworm-slim; no upstream fixed version).
