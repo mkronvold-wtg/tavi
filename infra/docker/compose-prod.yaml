@@ -44,7 +44,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
+    command: ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
 
   api:
     image: ${TAVI_API_IMAGE:?Set TAVI_API_IMAGE from compose-prod.images.env}

@@ -50,13 +50,24 @@ RUN groupmod -g 10001 node \
 
 # gzip/tar are Essential and libacl1 is a Pre-Depends of coreutils/sed, so
 # apt-get remove refuses or would cascade-remove dpkg. Force-purge only these
-# unused packages after libssl3t64 is installed. Runtime is node + Prisma
-# schema-engine (libssl.so.3), which do not need gzip/tar/libacl1.
+# unused packages after libssl3t64 is installed. schema-engine needs
+# libssl.so.3, not gzip/tar/libacl1. The Prisma CLI npm shim does call sed
+# (libacl); replace that shim after COPY instead of keeping libacl1.
 # CVEs: gzip CVE-2026-41991, libacl1 CVE-2026-54370, tar CVE-2026-18477.
 RUN dpkg --purge --force-remove-essential --force-depends gzip libacl1 tar \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder --chown=node:node /opt/tavi/api ./
+
+# pnpm's prisma shim uses sed to compute basedir. Debian sed links
+# libacl.so.1, which we purge. A sed-free wrapper keeps compose/k8s
+# `./node_modules/.bin/prisma migrate deploy` working.
+RUN printf '%s\n' \
+      '#!/bin/sh' \
+      'exec node /app/node_modules/prisma/build/index.js "$@"' \
+      > /app/node_modules/.bin/prisma \
+  && chmod 755 /app/node_modules/.bin/prisma \
+  && chown node:node /app/node_modules/.bin/prisma
 
 USER node
 
