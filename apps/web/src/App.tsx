@@ -61,7 +61,8 @@ import {
 } from "./api";
 import { maskSmtpPassword } from "./redact-secrets";
 import { BackupSettingsCard } from "./BackupSettingsCard";
-import { buildShaLabel, formatBuildDate } from "./build-info";
+import { BuildDateLabel } from "./BuildDateLabel";
+import { buildShaLabel } from "./build-info";
 import { ExportPanel } from "./ExportPanel";
 import { downloadCsvFile } from "./export-utils";
 import { ImportPanel } from "./ImportPanel";
@@ -6068,9 +6069,7 @@ function SettingsPanel({
               {`${appName} ${buildShaLabel}`}
             </a>
           </div>
-          <span className="settings-version-detail">
-            {`built ${formatBuildDate()}`}
-          </span>
+          <BuildDateLabel />
           {isAdmin && smtpServer ? (
             <span className="settings-version-detail">{smtpServer}</span>
           ) : null}
