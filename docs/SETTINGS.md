@@ -29,18 +29,18 @@ Saving profile edits closes the panel after the update is accepted.
 
 ## Admin Settings
 
-| Section    | Setting             | What it changes                                                            |
-| ---------- | ------------------- | -------------------------------------------------------------------------- |
-| Admin-only | Email Notifications | Controls the global outbound email switch                                  |
-| Admin-only | Task Drag Handles   | Shows or hides manual task-reorder handles for every user in the workspace |
-| Admin-only | Backups             | Opens the dedicated backup and restore panel                               |
-| Admin-only | Import/Export       | Opens the dedicated import and export panel                                |
-| Admin-only | Retention           | Opens retention controls for backups, login history, change history, and notification history |
-| Admin-only | Local Accounts      | Opens the local-auth management panel                                      |
-| Admin-only | Audit Logins        | Opens system-wide sign-in audit history                                    |
-| Admin-only | Audit Notifications | Opens system-wide outbound notification and email delivery history         |
-| Admin-only | Audit Changes       | Opens system-wide project and task change history without email delivery rows |
-| Meta       | Version             | Shows the current app version and repository link                          |
+| Section    | Setting             | What it changes                                                                                                                         |
+| ---------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Admin-only | Email Notifications | Controls the global outbound email switch                                                                                               |
+| Admin-only | Task Drag Handles   | Shows or hides manual task-reorder handles for every user in the workspace                                                              |
+| Admin-only | Backups             | Opens the dedicated backup and restore panel                                                                                            |
+| Admin-only | Import/Export       | Opens the dedicated import and export panel                                                                                             |
+| Admin-only | Retention           | Opens retention controls for backups, login history, change history, and notification history                                           |
+| Admin-only | Local Accounts      | Opens the local-auth management panel                                                                                                   |
+| Admin-only | Audit Logins        | Opens system-wide sign-in audit history                                                                                                 |
+| Admin-only | Audit Notifications | Opens system-wide outbound notification and email delivery history                                                                      |
+| Admin-only | Audit Changes       | Opens system-wide project and task change history without email delivery rows                                                           |
+| Meta       | Version             | Shows the current app version, changelog link, and build date/time. The timezone label toggles between UTC and the browser's local time |
 
 ## Recommended use
 

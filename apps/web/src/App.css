@@ -881,6 +881,17 @@
 .settings-version-detail {
   font-size: 0.8rem;
   color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.settings-timezone-toggle {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link-color);
+  font: inherit;
+  cursor: pointer;
 }
 
 .settings-item-header {
