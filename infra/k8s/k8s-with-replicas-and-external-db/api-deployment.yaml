@@ -52,7 +52,7 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-          command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
+          command: ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
           env:
             - name: PORT
               valueFrom:
