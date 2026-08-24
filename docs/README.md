@@ -33,6 +33,7 @@ Use this folder as the main entry point for product usage, local setup, and Kube
 | [`DOCKER.md`](./DOCKER.md)             | Prebuilt GHCR image startup, one-shot migration and seed steps, and local troubleshooting                                |
 | [`KUBERNETES.md`](./KUBERNETES.md)     | Raw-manifest deployment, config and secret setup, optional in-cluster PostgreSQL, rollouts, scaling, and troubleshooting |
 | [`CI.md`](./CI.md)                     | GitHub Actions validation, container builds, Trivy code scanning, and accepted-risk exception handling                   |
+| [`WORKFLOWS.md`](./WORKFLOWS.md)       | Workflow map: public GHCR/Compose vs private Artifactory/Kubernetes, sequence, and per-workflow jobs                     |
 | [`LCM.md`](./LCM.md)                   | Container image refreshes, dependency update automation, deployment consumption, and manual lifecycle review items       |
 | [`GITHUB-SETUP.md`](./GITHUB-SETUP.md) | Repository settings for image publishing, code scanning, Dependabot, auto-merge, and GHCR access                         |
 
