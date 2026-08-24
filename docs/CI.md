@@ -4,7 +4,8 @@ Tavi uses GitHub Actions to validate code, publish attestable container images,
 scan artifacts, and automate reviewed dependency maintenance. The supported
 Node baseline is 26, declared in `.node-version` and `package.json`.
 
-See [`LCM.md`](./LCM.md) for promotion and rollback, and
+See [`WORKFLOWS.md`](./WORKFLOWS.md) for the public/private lane map and
+sequence, [`LCM.md`](./LCM.md) for promotion and rollback, and
 [`GITHUB-SETUP.md`](./GITHUB-SETUP.md) for required repository settings.
 
 ## Workflows
