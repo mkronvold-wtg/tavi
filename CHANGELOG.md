@@ -10,6 +10,7 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+- Renewed 18 time-boxed Trivy ignores from 2026-08-31 to 2026-11-30, and added Fastify 5.12.0 exceptions for CVE-2026-16732 and CVE-2026-18504 (only fix is Fastify 6.0.0-alpha.0; NestJS 11 does not support it).
 - Made the Settings build-date timezone a clickable toggle between UTC and the browser's local time.
 - Documented GitHub Actions as a public GHCR/Compose vs private Artifactory/Kubernetes map in `docs/WORKFLOWS.md`.
 - Fixed Prisma `migrate deploy` on Trixie API images: the npm CLI shim needs `sed`/`libacl1` (purged for CVE-2026-54370). Invoke the CLI with `node` and replace the shim so compose/k8s migrate no longer require libacl.
