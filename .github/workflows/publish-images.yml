@@ -366,6 +366,25 @@ jobs:
           provenance: mode=max
           sbom: true
 
+      - name: Scan published internal image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sv4.art.e2open.com/dcops-docker-repo/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          format: table
+          output: internal-${{ matrix.service }}-trivy.txt
+          severity: HIGH,CRITICAL
+          scanners: vuln
+          trivyignores: .trivyignore.yaml
+          exit-code: "1"
+
+      - name: Upload internal image scan report
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: internal-${{ matrix.service }}-trivy-report
+          path: internal-${{ matrix.service }}-trivy.txt
+          retention-days: 180
+
       - name: Save internal image digest
         run: printf '%s\n' '${{ steps.build.outputs.digest }}' > internal-${{ matrix.service }}.digest
 

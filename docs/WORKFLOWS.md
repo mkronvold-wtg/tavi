@@ -33,7 +33,7 @@ flowchart TB
     MONAPP[Refresh container images]
     MONBSI[Refresh BSI images]
     DEP --> AM --> FRI --> RELPR --> TAGWF --> VTAG
-    MONAPP -.->|"does not deploy"| CAND[Candidate tags only]
+    MONAPP -.->|"fail-closed internal Trivy; does not deploy"| CAND[Candidate tags only]
     MONBSI -.-> BSPIN[BSI postgres pin PR]
   end
 
@@ -50,10 +50,11 @@ flowchart TB
     P2[Publish: validate]
     GH[Build + push public GHCR]
     AF[Rebuild + push private Artifactory]
+    AFT[Fail-closed Trivy HIGH/CRITICAL]
     DEV[Deploy sha-* candidates to tavi-dev]
     S2[Scan: Trivy + code scanning]
     MAIN --> P2 --> GH
-    P2 --> AF --> DEV
+    P2 --> AF --> AFT --> DEV
     MAIN --> S2
     MAIN --> TAGWF
   end
@@ -108,11 +109,12 @@ Each workflow file is under [`.github/workflows/`](../.github/workflows/).
 | When | What happens |
 | ---- | ------------ |
 | Pull request | Detect container-relevant paths. Required checks still appear: skip with a green placeholder, or lint/typecheck/test and build images **without** pushing. |
-| Push to `main` | Same validation, then **two publishes**: GHCR (`latest`, branch, `sha-*`) on GitHub-hosted runners, and Artifactory on `docker-wtg`. After all three internal images land, deploy `sha-<shortsha>` to `tavi-dev`. |
+| Push to `main` | Same validation, then **two publishes**: GHCR (`latest`, branch, `sha-*`) on GitHub-hosted runners, and Artifactory on `docker-wtg`. Each internal digest is scanned fail-closed for High/Critical vulns (`exit-code: 1`, `.trivyignore.yaml`). After all three internal images pass that gate, deploy `sha-<shortsha>` to `tavi-dev`. |
 | `v*` tag | Same dual publish with version tags, then open the release-pin PR (Compose → GHCR digests, k8s → `repo.ops` digests). |
 
 Jobs, in order: detect changes → validate workspace → build/publish public →
-publish internal → deploy tavi-dev → (tags only) create release-pin PR.
+publish internal (fail-closed digest Trivy) → deploy tavi-dev → (tags only)
+create release-pin PR.
 
 ### Scan container images
 
@@ -128,7 +130,9 @@ publish internal → deploy tavi-dev → (tags only) create release-pin PR.
 
 `refresh-images.yml` — Mondays 08:17 UTC or manual. Rebuilds from current
 `main` with a no-cache pull of base images. Publishes `latest` + `refresh-*` to
-**both** GHCR and Artifactory. Attaches SBOM/provenance. **Does not deploy.**
+**both** GHCR and Artifactory. Attaches SBOM/provenance. GHCR refresh scans
+are informational; internal Artifactory refreshes fail closed on High/Critical
+findings, matching internal publish. **Does not deploy.**
 
 ### Refresh BSI images
 
