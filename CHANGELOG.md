@@ -10,7 +10,7 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
-## 0.9.24 - 2026-08-28
+## 0.9.24 - 2026-08-28 - sha-f541c33
 
 - Made the Settings build-date timezone a clickable toggle between UTC and the browser's local time.
 - Documented GitHub Actions as a public GHCR/Compose vs private Artifactory/Kubernetes map in `docs/WORKFLOWS.md`.
