@@ -10,6 +10,8 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+## 0.9.24 - 2026-08-28
+
 - Made the Settings build-date timezone a clickable toggle between UTC and the browser's local time.
 - Documented GitHub Actions as a public GHCR/Compose vs private Artifactory/Kubernetes map in `docs/WORKFLOWS.md`.
 - Fixed Prisma `migrate deploy` on Trixie API images: the npm CLI shim needs `sed`/`libacl1` (purged for CVE-2026-54370). Invoke the CLI with `node` and replace the shim so compose/k8s migrate no longer require libacl.
