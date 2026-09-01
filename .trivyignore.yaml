@@ -2,6 +2,15 @@
 # an expiration date. Dependabot tracks the pinned base-image digest; remove
 # these entries as soon as an upstream fixed package is available.
 vulnerabilities:
+  - id: CVE-2026-39113
+    statement: "Owner: platform. libsqlite3-0 3.46.1-7+deb13u1 is inherited from node:26-trixie-slim in API, web, and worker. Trivy reports no fixed version. Safe removal is blocked because essential util-linux pre-depends on liblastlog2-2, which depends on libsqlite3-0. Review the Debian package and base-image digest; remove when a fixed package is available."
+    expired_at: 2026-09-15
+  - id: CVE-2026-11822
+    statement: "Owner: platform. SQLite FTS5 vulnerability in libsqlite3-0 3.46.1-7+deb13u1 inherited from node:26-trixie-slim in API, web, and worker. Trivy reports no fixed version. Safe removal is blocked because essential util-linux pre-depends on liblastlog2-2, which depends on libsqlite3-0. Review the Debian package and base-image digest; remove when a fixed package is available."
+    expired_at: 2026-09-15
+  - id: CVE-2026-11824
+    statement: "Owner: platform. SQLite FTS5 vulnerability in libsqlite3-0 3.46.1-7+deb13u1 inherited from node:26-trixie-slim in API, web, and worker. Trivy reports no fixed version. Safe removal is blocked because essential util-linux pre-depends on liblastlog2-2, which depends on libsqlite3-0. Review the Debian package and base-image digest; remove when a fixed package is available."
+    expired_at: 2026-09-15
   - id: CVE-2026-14456
     statement: "Owner: platform. Prisma schema-engine is dynamically linked to libssl.so.3; bookworm libssl3 3.0.20-1~deb12u2 has no fixed version. Do not install the openssl CLI package."
     expired_at: 2026-09-30
