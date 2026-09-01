@@ -12,9 +12,9 @@ sequence, [`LCM.md`](./LCM.md) for promotion and rollback, and
 
 | Workflow                        | When it runs                                               | What it does                                                                                                                                                                                                                                           |
 | ------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Detects container-relevant PR changes; validates and builds API/web/worker images only when needed, publishing public GHCR images and internal Artifactory images from the trusted `docker-wtg` runner outside PRs. After internal `sha-*` publish, deploys those candidates to non-prod `tavi-dev` via jump-host `update.sh`. A `v*` tag also opens a release-pin PR. |
+| `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Detects container-relevant PR changes; validates and builds API/web/worker images only when needed, publishing public GHCR images and internal Artifactory images from the trusted `docker-wtg` runner outside PRs. After each internal digest is pushed, a fail-closed High/Critical Trivy scan must pass before `deploy-tavi-dev`. A `v*` tag also opens a release-pin PR. |
 | `Scan container images`         | Every PR, `main`, manual dispatch, or a successful refresh | Detects container-relevant PR changes; scans applicable API, web, and worker images with Trivy and uploads High/Critical SARIF findings to GitHub code scanning.                                                                                       |
-| `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans candidate `latest` and timestamped refresh images; also refreshes internal Artifactory images from `docker-wtg`. It does not deploy them.                                                            |
+| `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans candidate `latest` and timestamped refresh images. Public GHCR refresh scans are informational (`exit-code: 0`); internal Artifactory refreshes from `docker-wtg` use the same fail-closed High/Critical gate as internal publish. It does not deploy them. |
 | `Refresh BSI images`            | Mondays 07:23 UTC, push to `main` touching BSI pins, or manual dispatch | Internal lane only: resolves latest Bitnami Secure Image tags from `sv4.art` on `docker-wtg`, updates `infra/images/bsi-*.pin.json`, syncs k8s consumers to `repo.ops` pull refs, opens a pin PR when the candidate moves, and deploys the pin to `tavi-dev` after it lands on `main`. |
 | `Cut weekly release`            | Fridays at 13:00 UTC or manual dispatch                    | Opens a version-bump PR from the latest default-branch tip when there is work to release. Patch by default; minor when `CHANGELOG.md` Unreleased contains a marked Features or Breaking section. Enables auto-merge after required checks.           |
 | `Tag release`                   | Push to `main` that lands a `Release x.y.z` commit         | Creates the annotated `v*` tag and GitHub Release notes from the changelog section. The tag push triggers image publish and the release-pin PR.                                                                                                       |
@@ -60,6 +60,14 @@ ancestor does not suppress the job on main/tag pushes. Neither
 `workflow_dispatch` nor any other branch ref can reach it. Scheduled
 refreshes enforce the same default-branch guard and the same Artifactory
 login secrets.
+
+After each internal image is pushed, `build-and-publish-internal` scans the
+exact `sv4.art.e2open.com` digest with `aquasecurity/trivy-action@v0.36.0`
+(High/Critical vulns only, `.trivyignore.yaml`, table report retained 180
+days as `internal-<service>-trivy-report`). That scan uses `exit-code: "1"`,
+so a new High/Critical finding fails the matrix job and therefore
+`deploy-tavi-dev`. This is stricter than the public GHCR publish scan, which
+keeps `exit-code: "0"` and leaves enforcement to `trivy-scan.yml`.
 
 The internal matrix is serialized because Tavi currently has one matching
 runner. GitHub-hosted runners continue to build and publish public GHCR
@@ -157,7 +165,9 @@ Every published image receives BuildKit SBOM and provenance attestations.
 Public GHCR publication also generates a CycloneDX SBOM and a High/Critical
 Trivy report from the exact remote digest for each service, retaining them as
 workflow artifacts for 180 days alongside the published digest. Internal
-Artifactory publication retains its immutable digest as a workflow artifact.
+Artifactory publication retains the same digest artifact plus a fail-closed
+High/Critical Trivy table report (`internal-<service>-trivy-report`, 180 days)
+from the exact `sv4.art` digest.
 
 For a `v*` tag, the workflow downloads the public GHCR digest records and the
 internal Artifactory digest records, then uses
@@ -207,7 +217,11 @@ suffixes when extending it.
 
 ### Enforced policy
 
-The scan fails on every High/Critical finding. The minimized, digest-pinned
+The scan fails on every High/Critical finding. That fail-closed gate applies
+to PR/`main` `trivy-scan.yml` jobs **and** to the private Artifactory lane
+(`build-and-publish-internal` and `refresh-internal`). Public GHCR publish
+and refresh scans still record High/Critical reports with `exit-code: "0"`;
+they do not block GHCR publication. The minimized, digest-pinned
 baseline reduced each image from 428 results to 27/28 results; the remaining
 unfixed upstream Debian and Prisma CLI findings have individually reviewed,
 time-boxed exceptions in [`.trivyignore.yaml`](../.trivyignore.yaml).
