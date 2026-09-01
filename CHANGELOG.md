@@ -11,9 +11,11 @@ Use optional markers under Unreleased to control the bump:
 ## Unreleased
 
 - Added a fail-closed High/Critical Trivy scan on internal Artifactory publishes (`build-and-publish-internal` and `refresh-internal`) so a new finding fails the job and therefore `deploy-tavi-dev`.
+- Renewed 18 time-boxed Trivy ignores from 2026-08-31 to 2026-11-30, and added Fastify 5.12.0 exceptions for CVE-2026-16732 and CVE-2026-18504 (only fix is Fastify 6.0.0-alpha.0; NestJS 11 does not support it).
 - Made the Settings build-date timezone a clickable toggle between UTC and the browser's local time.
 - Documented GitHub Actions as a public GHCR/Compose vs private Artifactory/Kubernetes map in `docs/WORKFLOWS.md`.
-- Fixed Prisma `migrate deploy` on Trixie API images: the npm CLI shim needs `sed`/`libacl1` (purged for CVE-2026-54370). Invoke the CLI with `node` and replace the shim so compose/k8s migrate no longer require libacl.
+- Removed the unused Prisma CLI wrapper from the API runtime image. Production compose and Kubernetes migrate already invoke `node node_modules/prisma/build/index.js`.
+- Fixed Prisma `migrate deploy` on Trixie API images: the npm CLI shim needs `sed`/`libacl1` (purged for CVE-2026-54370). Invoke the CLI with `node` so compose/k8s migrate no longer require libacl.
 - Upgraded API, web, and worker runtime images from `node:26-bookworm-slim` to digest-pinned `node:26-trixie-slim`, installing `libssl3t64` for Prisma schema-engine and applying Debian 13 security updates for util-linux (CVE-2026-53612, CVE-2026-53614).
 - Time-boxed Trivy ignore for CVE-2026-16742 (`libsystemd0`/`libudev1` in Node 26 bookworm-slim; no Debian bookworm fixed version).
 - Time-boxed Trivy ignore for CVE-2026-6368 (`libc6`/`libc-bin` in Node 26 bookworm-slim; no upstream fixed version).

@@ -2,69 +2,78 @@
 # an expiration date. Dependabot tracks the pinned base-image digest; remove
 # these entries as soon as an upstream fixed package is available.
 vulnerabilities:
+  - id: CVE-2026-39113
+    statement: "Owner: platform. libsqlite3-0 3.46.1-7+deb13u1 is inherited from node:26-trixie-slim in API, web, and worker. Trivy reports no fixed version. Safe removal is blocked because essential util-linux pre-depends on liblastlog2-2, which depends on libsqlite3-0. Review the Debian package and base-image digest; remove when a fixed package is available."
+    expired_at: 2026-09-15
+  - id: CVE-2026-11822
+    statement: "Owner: platform. SQLite FTS5 vulnerability in libsqlite3-0 3.46.1-7+deb13u1 inherited from node:26-trixie-slim in API, web, and worker. Trivy reports no fixed version. Safe removal is blocked because essential util-linux pre-depends on liblastlog2-2, which depends on libsqlite3-0. Review the Debian package and base-image digest; remove when a fixed package is available."
+    expired_at: 2026-09-15
+  - id: CVE-2026-11824
+    statement: "Owner: platform. SQLite FTS5 vulnerability in libsqlite3-0 3.46.1-7+deb13u1 inherited from node:26-trixie-slim in API, web, and worker. Trivy reports no fixed version. Safe removal is blocked because essential util-linux pre-depends on liblastlog2-2, which depends on libsqlite3-0. Review the Debian package and base-image digest; remove when a fixed package is available."
+    expired_at: 2026-09-15
   - id: CVE-2026-14456
     statement: "Owner: platform. Prisma schema-engine is dynamically linked to libssl.so.3; bookworm libssl3 3.0.20-1~deb12u2 has no fixed version. Do not install the openssl CLI package."
     expired_at: 2026-09-30
   - id: CVE-2023-45853
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream zlib1g fixed version; review the base-image digest."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2025-69720
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream ncurses fixed version; review the base-image digest."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-12151
     statement: "Owner: platform. The fixed undici version is bundled in the required Prisma 7 migration CLI; remove after Prisma publishes the fix."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-13149
     statement: "Owner: platform. The fixed brace-expansion version is bundled in the required Prisma 7 migration CLI; remove after Prisma publishes the fix."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-13221
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-14257
     statement: "Owner: platform. The fixed brace-expansion version is bundled in the required Prisma 7 migration CLI; remove after Prisma publishes the fix."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-41992
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream gzip fixed version; review the base-image digest."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-42496
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-42497
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-48962
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-53613
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream util-linux fixed version; review the base-image digest."
     expired_at: 2026-09-30
   - id: CVE-2026-53615
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream util-linux fixed version; review the base-image digest."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-54369
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libacl1 fixed version; review the base-image digest."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-5450
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libc6/libc-bin fixed version (2.36-9+deb12u14); review the base-image digest."
     expired_at: 2026-09-30
   - id: CVE-2026-57432
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-57433
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-59873
     statement: "Owner: platform. The fixed tar version is bundled in the required Prisma 7 migration CLI; remove after Prisma publishes the fix."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-59874
     statement: "Owner: platform. The fixed tar version is bundled in the required Prisma 7 migration CLI; remove after Prisma publishes the fix."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-8376
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-9538
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream libperl5.36 fixed version; review the base-image digest."
-    expired_at: 2026-08-31
+    expired_at: 2026-11-30
   - id: CVE-2026-6238
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream glibc (libc6/libc-bin) fixed version; review the base-image digest when a fix is published."
     expired_at: 2026-11-30
@@ -83,6 +92,12 @@ vulnerabilities:
   - id: CVE-2026-16742
     statement: "Owner: platform. Node 26 bookworm-slim has no upstream systemd/libsystemd0/libudev1 fixed version (bookworm 252.39-1~deb12u2; fix is 261.2-1 in sid only); review the base-image digest."
     expired_at: 2026-09-30
+  - id: CVE-2026-16732
+    statement: "Owner: platform. Only fix is Fastify 6.0.0-alpha.0; NestJS 11 (`@nestjs/platform-fastify` ^11.1.29, fastify pinned 5.12.0 in apps/api/package.json) does not support it. Remove when NestJS supports a fixed Fastify 5.x or we can take Fastify 6."
+    expired_at: 2027-02-28
+  - id: CVE-2026-18504
+    statement: "Owner: platform. Only fix is Fastify 6.0.0-alpha.0; NestJS 11 (`@nestjs/platform-fastify` ^11.1.29, fastify pinned 5.12.0 in apps/api/package.json) does not support it. Remove when NestJS supports a fixed Fastify 5.x or we can take Fastify 6."
+    expired_at: 2027-02-28
 misconfigurations:
   # Bitnami Secure PostgreSQL image requires UID/GID 1001; cannot raise above 10000.
   - id: KSV-0020
