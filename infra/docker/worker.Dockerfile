@@ -1,4 +1,4 @@
-FROM node:26-bookworm@sha256:0353e48e0e8a993db87b720c242f54b207059d1bcc0106534896e8a11054c837 AS builder
+FROM node:26-bookworm@sha256:9f94d34c787165dca03b74e5bf9c3bf90e8de79b19aa3d87fe1fa1694bf75c89 AS builder
 
 WORKDIR /app
 ARG PNPM_VERSION=10.33.0
@@ -36,7 +36,7 @@ RUN pnpm --filter @tavi/config build \
   && cp -a "$(dirname "$GENERATED")" "$DEST_NM/.prisma/client" \
   && test -f "$DEST_NM/.prisma/client/default.js"
 
-FROM node:26-trixie-slim@sha256:4ebb5ace66f15a24c14c492e01a8beeed4fddf970a856109f5126e703e5fe503 AS runtime
+FROM node:26-trixie-slim@sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02e4f1d7146 AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
