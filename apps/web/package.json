@@ -14,13 +14,13 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.102.0",
+    "@tanstack/react-query": "^5.102.8",
     "@tavi/config": "workspace:*",
     "@tavi/schemas": "workspace:*",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-markdown": "^10.1.0",
-    "react-router-dom": "^7.18.2",
+    "react-router-dom": "^7.18.3",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
     "write-excel-file": "4.1.1"
