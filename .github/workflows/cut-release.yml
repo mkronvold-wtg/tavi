@@ -57,12 +57,63 @@ jobs:
         run: |
           echo "${{ steps.inspect.outputs.reason }}"
 
+      - name: Detect existing release candidate
+        id: existing
+        if: steps.inspect.outputs.skipped != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.inspect.outputs.branch }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          existing_branch=false
+          if git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" >/dev/null; then
+            existing_branch=true
+          fi
+
+          existing_pr_url="$(gh pr list \
+            --repo "$REPOSITORY" \
+            --state open \
+            --base "$DEFAULT_BRANCH" \
+            --head "$BRANCH" \
+            --limit 1 \
+            --json url \
+            --jq '.[0].url // empty')"
+
+          if [[ "$existing_branch" == "true" || -n "$existing_pr_url" ]]; then
+            message="Release candidate $BRANCH already exists"
+            if [[ -n "$existing_pr_url" ]]; then
+              message="$message; existing PR: $existing_pr_url"
+            else
+              message="$message; no open release PR was found"
+            fi
+
+            echo "::notice title=Existing release candidate::$message. No branch was created or modified."
+            printf 'exists=true\npr_url=%s\n' "$existing_pr_url" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Existing release candidate"
+              echo
+              echo "$message"
+              echo
+              echo "No branch was created or modified."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "No existing release branch or open release PR found for $BRANCH."
+          printf 'exists=false\npr_url=\n' >> "$GITHUB_OUTPUT"
+
       - name: Create release branch and commit
         id: apply
-        if: steps.inspect.outputs.skipped != 'true'
+        if: steps.inspect.outputs.skipped != 'true' && steps.existing.outputs.exists != 'true'
         env:
           BUMP: ${{ steps.inspect.outputs.bump }}
           BRANCH: ${{ steps.inspect.outputs.branch }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -76,11 +127,37 @@ jobs:
             echo "short_sha=$(jq -r .short_sha apply.json)"
             echo "bump=$(jq -r .bump apply.json)"
           } >> "$GITHUB_OUTPUT"
-          git push --set-upstream origin "$BRANCH"
+          if git push --set-upstream origin "$BRANCH"; then
+            echo "existing=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" >/dev/null; then
+            echo "::error title=Release branch push failed::Unable to push $BRANCH, and no remote branch was found."
+            exit 1
+          fi
+
+          existing_pr_url="$(gh pr list \
+            --repo "$REPOSITORY" \
+            --state open \
+            --base "$DEFAULT_BRANCH" \
+            --head "$BRANCH" \
+            --limit 1 \
+            --json url \
+            --jq '.[0].url // empty')"
+          message="Release candidate $BRANCH was created concurrently; the workflow did not overwrite it"
+          if [[ -n "$existing_pr_url" ]]; then
+            message="$message; existing PR: $existing_pr_url"
+          else
+            message="$message; no open release PR was found"
+          fi
+
+          echo "::notice title=Existing release candidate::$message."
+          printf 'existing=true\npr_url=%s\n' "$existing_pr_url" >> "$GITHUB_OUTPUT"
 
       - name: Open release pull request
         id: pr
-        if: steps.inspect.outputs.skipped != 'true'
+        if: steps.inspect.outputs.skipped != 'true' && steps.existing.outputs.exists != 'true' && steps.apply.outputs.existing != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.apply.outputs.next_version }}
