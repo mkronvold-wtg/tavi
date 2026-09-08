@@ -34,7 +34,20 @@ jobs:
           set -euo pipefail
 
           case "$PACKAGE_ECOSYSTEM" in
-            npm_and_yarn|github_actions|docker) ;;
+            npm_and_yarn)
+              case "$UPDATE_TYPE" in
+                version-update:semver-major)
+                  echo "Major npm updates require a separately reviewed PR."
+                  exit 0
+                  ;;
+                version-update:semver-minor|version-update:semver-patch) ;;
+                *)
+                  echo "Skipping npm update with unsupported type: $UPDATE_TYPE"
+                  exit 0
+                  ;;
+              esac
+              ;;
+            github_actions|docker) ;;
             *)
               echo "Skipping unsupported Dependabot ecosystem: $PACKAGE_ECOSYSTEM"
               exit 0
@@ -65,4 +78,3 @@ jobs:
           fi
 
           gh pr merge --auto --squash --delete-branch "$PR_URL"
-

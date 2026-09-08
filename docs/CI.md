@@ -150,14 +150,41 @@ Dependabot runs on its weekly cadence (typically Monday). The product release is
 1. `Cut weekly release` runs Friday 13:00 UTC (08:00 CDT / 07:00 CST) or on demand.
 2. [`scripts/cut-release.mjs`](../scripts/cut-release.mjs) inspects commits since the last `Release x.y.z` commit and the `## Unreleased` changelog section.
 3. If there is nothing to ship, the workflow exits successfully without opening a PR.
-4. Otherwise it bumps every workspace `package.json` and `packages/config/src/app-version.ts`, folds Unreleased notes into a dated version section, opens `Release x.y.z`, and enables auto-merge.
-5. After that PR merges, `Tag release` creates `vx.y.z` and a GitHub Release. Existing `Publish container images` tag handling publishes images and opens the immutable release-pin PR.
+4. If the computed `release/vx.y.z` branch or its open release PR already exists, the workflow exits successfully without changing it and logs the existing PR URL when one is available.
+5. Otherwise it bumps every workspace `package.json` and `packages/config/src/app-version.ts`, folds Unreleased notes into a dated version section, opens `Release x.y.z`, and enables auto-merge.
+6. After that PR merges, `Tag release` creates `vx.y.z` and a GitHub Release. Existing `Publish container images` tag handling publishes images and opens the immutable release-pin PR.
 
 Bump rule:
 
 - **patch** by default
 - **minor** when Unreleased contains a marked `### Features` or `### Breaking Changes` section
 - major remains manual
+
+### Release recovery and security prerequisites
+
+Release candidates must not bypass outstanding runtime security remediation.
+Merge the approved security fixes to the default branch before recovering or
+approving a release candidate. Major npm/framework updates are separately
+reviewed and do not auto-merge with the routine dependency lanes.
+
+When the weekly cut reports an existing release branch or release PR:
+
+1. Open the URL emitted in the `Existing release candidate` workflow notice,
+   or run `gh pr list --repo mkronvold-wtg/tavi --state open --base main --head release/vX.Y.Z --json url,mergeable,headRefOid`.
+2. Do **not** rerun the cut expecting it to overwrite the candidate, and never
+   force-push, delete, or recreate `release/vX.Y.Z`.
+3. After the security fixes are on `main`, update the existing candidate through
+   its reviewed PR: fetch `origin/main`, merge it into `release/vX.Y.Z`, resolve
+   conflicts, run the required checks, and push the resulting normal
+   fast-forward/non-force update.
+4. Confirm the PR's version and changelog are still correct, obtain required
+   approvals, and allow auto-merge (or merge it through the approved release
+   path). `Tag release` then creates the tag, `Publish container images`
+   publishes the images and deploys the `tavi-dev` candidate, and the tag opens
+   the immutable release-pin PR.
+5. Only if the candidate is explicitly abandoned, close its PR and delete the
+   branch after recording why; then run a new cut from the current default
+   branch. Do not use this path to bypass security remediation.
 
 ## Image evidence and version promotion
 
@@ -227,16 +254,17 @@ unfixed upstream Debian and Prisma CLI findings have individually reviewed,
 time-boxed exceptions in [`.trivyignore.yaml`](../.trivyignore.yaml).
 
 First remediate findings through dependency updates, base-image digest updates,
-or image-content reduction. Only unavoidable findings may be added to the
-exception registry, with:
+or image-content reduction before approving a release. Only unavoidable
+findings may be added to the exception registry after explicit approval from
+the security owner, with:
 
 1. A specific vulnerability `id`
 2. An owner and mitigation in `statement`
 3. An `expired_at` date
 
-Remove an exception as soon as the upstream fix is published. The three service
-scan jobs are required checks on `main`; do not add broad or permanent
-suppressions.
+Exceptions are time-boxed: review them before expiry and remove them as soon as
+the upstream fix is published. The three service scan jobs are required checks
+on `main`; do not add broad, unapproved, or permanent suppressions.
 
 ## Pull-request expectations
 
@@ -247,3 +275,16 @@ Every pull request must pass:
 3. All three Trivy scan jobs
 4. New code-scanning alerts
 5. SBOM/provenance and the generated release-pin PR for a version-tagged build
+
+### Dependabot workflow approvals
+
+Dependabot's routine npm updates are grouped separately into production/runtime
+and development/tooling minor or patch lanes. Major npm and framework updates
+remain separate review work and are not auto-merged. GitHub Actions and Docker
+Dependabot behavior remains unchanged.
+
+A repository maintainer must approve workflow runs awaiting approval for every
+Dependabot or other bot PR before its required Actions checks can execute.
+Approve only the expected bot revision, then wait for the required checks and
+normal review policy before merging; do not treat workflow approval as a code
+approval.
