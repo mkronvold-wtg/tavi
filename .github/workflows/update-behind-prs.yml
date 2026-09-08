@@ -1,0 +1,87 @@
+name: Update behind pull requests
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - labeled
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Optional pull request number to update
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-behind-pull-requests
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update eligible behind pull requests
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+      INPUT_PR_NUMBER: ${{ inputs.pull_request }}
+    steps:
+      - name: Update eligible branches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pr_number="${INPUT_PR_NUMBER:-${EVENT_PR_NUMBER:-}}"
+          if [[ -n "${pr_number}" ]]; then
+            pull_requests="$(gh pr view "${pr_number}" --repo "${GITHUB_REPOSITORY}" \
+              --json number,headRefOid,mergeStateStatus,author,labels | jq -s '.')"
+          else
+            pull_requests="$(gh pr list --state open --limit 100 --repo "${GITHUB_REPOSITORY}" \
+              --json number,headRefOid,mergeStateStatus,author,labels)"
+          fi
+
+          updated=0
+          skipped=0
+          while IFS= read -r pull_request; do
+            number="$(jq -r '.number' <<<"${pull_request}")"
+            merge_state="$(jq -r '.mergeStateStatus' <<<"${pull_request}")"
+            bot_authored="$(jq -r '.author.is_bot' <<<"${pull_request}")"
+            opted_in="$(jq -r 'any(.labels[]?; .name == "auto-update-branch")' <<<"${pull_request}")"
+
+            if [[ "${merge_state}" != "BEHIND" ]]; then
+              echo "Skipping #${number}: merge state is ${merge_state}."
+              skipped=$((skipped + 1))
+              continue
+            fi
+
+            if [[ "${bot_authored}" != "true" && "${opted_in}" != "true" ]]; then
+              echo "Skipping #${number}: not bot-authored and missing the auto-update-branch label."
+              skipped=$((skipped + 1))
+              continue
+            fi
+
+            head_sha="$(jq -r '.headRefOid' <<<"${pull_request}")"
+            echo "Updating #${number} from expected head ${head_sha}."
+            if gh api --method PUT "repos/${GITHUB_REPOSITORY}/pulls/${number}/update-branch" \
+              -f "expected_head_sha=${head_sha}"; then
+              updated=$((updated + 1))
+            else
+              echo "::warning::Unable to update #${number}; it may have changed or require conflict resolution."
+              skipped=$((skipped + 1))
+            fi
+          done < <(jq -c '.[]' <<<"${pull_requests}")
+
+          {
+            echo "## Behind pull request update"
+            echo
+            echo "- Updated: ${updated}"
+            echo "- Skipped: ${skipped}"
+          } >> "${GITHUB_STEP_SUMMARY}"

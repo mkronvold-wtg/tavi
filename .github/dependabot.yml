@@ -24,11 +24,14 @@ updates:
         update-types:
           - "version-update:semver-major"
     groups:
-      npm-all:
-        patterns:
-          - "*"
+      npm-production-runtime:
+        dependency-type: production
         update-types:
-          - major
+          - minor
+          - patch
+      npm-development-tooling:
+        dependency-type: development
+        update-types:
           - minor
           - patch
 
@@ -132,4 +135,3 @@ updates:
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-web"
       - dependency-name: "sv4.art.e2open.com/dcops-docker-repo/tavi-worker"
       - dependency-name: "sv4.art.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql"
-

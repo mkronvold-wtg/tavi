@@ -26,7 +26,7 @@ RUN pnpm --filter @tavi/config build \
   && pnpm --filter @tavi/schemas build \
   && pnpm --filter @tavi/web build
 
-FROM node:26-trixie-slim@sha256:4ebb5ace66f15a24c14c492e01a8beeed4fddf970a856109f5126e703e5fe503 AS runtime
+FROM node:26-trixie-slim@sha256:1f42150ac9ff2ca8728e6eb2d3e597ee6ea8bb5fe7a3b748101565ce8cd02dc8 AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production

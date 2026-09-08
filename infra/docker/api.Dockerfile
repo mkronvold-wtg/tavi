@@ -30,7 +30,7 @@ RUN ./node_modules/.bin/prisma generate \
     -o -n "$(find node_modules -type f -path '*/.prisma/client/default.js' | head -n 1)" \
   && test -n "$(find node_modules -name 'schema-engine-debian-openssl-3*' -type f | head -n 1)"
 
-FROM node:26-trixie-slim@sha256:4ebb5ace66f15a24c14c492e01a8beeed4fddf970a856109f5126e703e5fe503 AS runtime
+FROM node:26-trixie-slim@sha256:1f42150ac9ff2ca8728e6eb2d3e597ee6ea8bb5fe7a3b748101565ce8cd02dc8 AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
@@ -51,23 +51,13 @@ RUN groupmod -g 10001 node \
 # gzip/tar are Essential and libacl1 is a Pre-Depends of coreutils/sed, so
 # apt-get remove refuses or would cascade-remove dpkg. Force-purge only these
 # unused packages after libssl3t64 is installed. schema-engine needs
-# libssl.so.3, not gzip/tar/libacl1. The Prisma CLI npm shim does call sed
-# (libacl); replace that shim after COPY instead of keeping libacl1.
+# libssl.so.3, not gzip/tar/libacl1. Production migrate invokes the Prisma
+# CLI with node (not the npm .bin shim, which calls sed/libacl).
 # CVEs: gzip CVE-2026-41991, libacl1 CVE-2026-54370, tar CVE-2026-18477.
 RUN dpkg --purge --force-remove-essential --force-depends gzip libacl1 tar \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder --chown=node:node /opt/tavi/api ./
-
-# pnpm's prisma shim uses sed to compute basedir. Debian sed links
-# libacl.so.1, which we purge. A sed-free wrapper keeps compose/k8s
-# `./node_modules/.bin/prisma migrate deploy` working.
-RUN printf '%s\n' \
-      '#!/bin/sh' \
-      'exec node /app/node_modules/prisma/build/index.js "$@"' \
-      > /app/node_modules/.bin/prisma \
-  && chmod 755 /app/node_modules/.bin/prisma \
-  && chown node:node /app/node_modules/.bin/prisma
 
 USER node
 

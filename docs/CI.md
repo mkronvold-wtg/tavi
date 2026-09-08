@@ -12,9 +12,9 @@ sequence, [`LCM.md`](./LCM.md) for promotion and rollback, and
 
 | Workflow                        | When it runs                                               | What it does                                                                                                                                                                                                                                           |
 | ------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Detects container-relevant PR changes; validates and builds API/web/worker images only when needed, publishing public GHCR images and internal Artifactory images from the trusted `docker-wtg` runner outside PRs. After internal `sha-*` publish, deploys those candidates to non-prod `tavi-dev` via jump-host `update.sh`. A `v*` tag also opens a release-pin PR. |
+| `Publish container images`      | Every PR, `main`, `v*` tags, or manual dispatch            | Detects container-relevant PR changes; validates and builds API/web/worker images only when needed, publishing public GHCR images and internal Artifactory images from the trusted `docker-wtg` runner outside PRs. After each internal digest is pushed, a fail-closed High/Critical Trivy scan must pass before `deploy-tavi-dev`. A `v*` tag also opens a release-pin PR. |
 | `Scan container images`         | Every PR, `main`, manual dispatch, or a successful refresh | Detects container-relevant PR changes; scans applicable API, web, and worker images with Trivy and uploads High/Critical SARIF findings to GitHub code scanning.                                                                                       |
-| `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans candidate `latest` and timestamped refresh images; also refreshes internal Artifactory images from `docker-wtg`. It does not deploy them.                                                            |
+| `Refresh container images`      | Mondays at 08:17 UTC or manual dispatch                    | Re-validates, tests, rebuilds, attests, and scans candidate `latest` and timestamped refresh images. Public GHCR refresh scans are informational (`exit-code: 0`); internal Artifactory refreshes from `docker-wtg` use the same fail-closed High/Critical gate as internal publish. It does not deploy them. |
 | `Refresh BSI images`            | Mondays 07:23 UTC, push to `main` touching BSI pins, or manual dispatch | Internal lane only: resolves latest Bitnami Secure Image tags from `sv4.art` on `docker-wtg`, updates `infra/images/bsi-*.pin.json`, syncs k8s consumers to `repo.ops` pull refs, opens a pin PR when the candidate moves, and deploys the pin to `tavi-dev` after it lands on `main`. |
 | `Cut weekly release`            | Fridays at 13:00 UTC or manual dispatch                    | Opens a version-bump PR from the latest default-branch tip when there is work to release. Patch by default; minor when `CHANGELOG.md` Unreleased contains a marked Features or Breaking section. Enables auto-merge after required checks.           |
 | `Tag release`                   | Push to `main` that lands a `Release x.y.z` commit         | Creates the annotated `v*` tag and GitHub Release notes from the changelog section. The tag push triggers image publish and the release-pin PR.                                                                                                       |
@@ -60,6 +60,14 @@ ancestor does not suppress the job on main/tag pushes. Neither
 `workflow_dispatch` nor any other branch ref can reach it. Scheduled
 refreshes enforce the same default-branch guard and the same Artifactory
 login secrets.
+
+After each internal image is pushed, `build-and-publish-internal` scans the
+exact `sv4.art.e2open.com` digest with `aquasecurity/trivy-action@v0.36.0`
+(High/Critical vulns only, `.trivyignore.yaml`, table report retained 180
+days as `internal-<service>-trivy-report`). That scan uses `exit-code: "1"`,
+so a new High/Critical finding fails the matrix job and therefore
+`deploy-tavi-dev`. This is stricter than the public GHCR publish scan, which
+keeps `exit-code: "0"` and leaves enforcement to `trivy-scan.yml`.
 
 The internal matrix is serialized because Tavi currently has one matching
 runner. GitHub-hosted runners continue to build and publish public GHCR
@@ -142,8 +150,9 @@ Dependabot runs on its weekly cadence (typically Monday). The product release is
 1. `Cut weekly release` runs Friday 13:00 UTC (08:00 CDT / 07:00 CST) or on demand.
 2. [`scripts/cut-release.mjs`](../scripts/cut-release.mjs) inspects commits since the last `Release x.y.z` commit and the `## Unreleased` changelog section.
 3. If there is nothing to ship, the workflow exits successfully without opening a PR.
-4. Otherwise it bumps every workspace `package.json` and `packages/config/src/app-version.ts`, folds Unreleased notes into a dated version section, opens `Release x.y.z`, and enables auto-merge.
-5. After that PR merges, `Tag release` creates `vx.y.z` and a GitHub Release. Existing `Publish container images` tag handling publishes images and opens the immutable release-pin PR.
+4. If the computed `release/vx.y.z` branch or its open release PR already exists, the workflow exits successfully without changing it and logs the existing PR URL when one is available.
+5. Otherwise it bumps every workspace `package.json` and `packages/config/src/app-version.ts`, folds Unreleased notes into a dated version section, opens `Release x.y.z`, and enables auto-merge.
+6. After that PR merges, `Tag release` creates `vx.y.z` and a GitHub Release. Existing `Publish container images` tag handling publishes images and opens the immutable release-pin PR.
 
 Bump rule:
 
@@ -151,13 +160,41 @@ Bump rule:
 - **minor** when Unreleased contains a marked `### Features` or `### Breaking Changes` section
 - major remains manual
 
+### Release recovery and security prerequisites
+
+Release candidates must not bypass outstanding runtime security remediation.
+Merge the approved security fixes to the default branch before recovering or
+approving a release candidate. Major npm/framework updates are separately
+reviewed and do not auto-merge with the routine dependency lanes.
+
+When the weekly cut reports an existing release branch or release PR:
+
+1. Open the URL emitted in the `Existing release candidate` workflow notice,
+   or run `gh pr list --repo mkronvold-wtg/tavi --state open --base main --head release/vX.Y.Z --json url,mergeable,headRefOid`.
+2. Do **not** rerun the cut expecting it to overwrite the candidate, and never
+   force-push, delete, or recreate `release/vX.Y.Z`.
+3. After the security fixes are on `main`, update the existing candidate through
+   its reviewed PR: fetch `origin/main`, merge it into `release/vX.Y.Z`, resolve
+   conflicts, run the required checks, and push the resulting normal
+   fast-forward/non-force update.
+4. Confirm the PR's version and changelog are still correct, obtain required
+   approvals, and allow auto-merge (or merge it through the approved release
+   path). `Tag release` then creates the tag, `Publish container images`
+   publishes the images and deploys the `tavi-dev` candidate, and the tag opens
+   the immutable release-pin PR.
+5. Only if the candidate is explicitly abandoned, close its PR and delete the
+   branch after recording why; then run a new cut from the current default
+   branch. Do not use this path to bypass security remediation.
+
 ## Image evidence and version promotion
 
 Every published image receives BuildKit SBOM and provenance attestations.
 Public GHCR publication also generates a CycloneDX SBOM and a High/Critical
 Trivy report from the exact remote digest for each service, retaining them as
 workflow artifacts for 180 days alongside the published digest. Internal
-Artifactory publication retains its immutable digest as a workflow artifact.
+Artifactory publication retains the same digest artifact plus a fail-closed
+High/Critical Trivy table report (`internal-<service>-trivy-report`, 180 days)
+from the exact `sv4.art` digest.
 
 For a `v*` tag, the workflow downloads the public GHCR digest records and the
 internal Artifactory digest records, then uses
@@ -207,22 +244,27 @@ suffixes when extending it.
 
 ### Enforced policy
 
-The scan fails on every High/Critical finding. The minimized, digest-pinned
+The scan fails on every High/Critical finding. That fail-closed gate applies
+to PR/`main` `trivy-scan.yml` jobs **and** to the private Artifactory lane
+(`build-and-publish-internal` and `refresh-internal`). Public GHCR publish
+and refresh scans still record High/Critical reports with `exit-code: "0"`;
+they do not block GHCR publication. The minimized, digest-pinned
 baseline reduced each image from 428 results to 27/28 results; the remaining
 unfixed upstream Debian and Prisma CLI findings have individually reviewed,
 time-boxed exceptions in [`.trivyignore.yaml`](../.trivyignore.yaml).
 
 First remediate findings through dependency updates, base-image digest updates,
-or image-content reduction. Only unavoidable findings may be added to the
-exception registry, with:
+or image-content reduction before approving a release. Only unavoidable
+findings may be added to the exception registry after explicit approval from
+the security owner, with:
 
 1. A specific vulnerability `id`
 2. An owner and mitigation in `statement`
 3. An `expired_at` date
 
-Remove an exception as soon as the upstream fix is published. The three service
-scan jobs are required checks on `main`; do not add broad or permanent
-suppressions.
+Exceptions are time-boxed: review them before expiry and remove them as soon as
+the upstream fix is published. The three service scan jobs are required checks
+on `main`; do not add broad, unapproved, or permanent suppressions.
 
 ## Pull-request expectations
 
@@ -233,3 +275,16 @@ Every pull request must pass:
 3. All three Trivy scan jobs
 4. New code-scanning alerts
 5. SBOM/provenance and the generated release-pin PR for a version-tagged build
+
+### Dependabot workflow approvals
+
+Dependabot's routine npm updates are grouped separately into production/runtime
+and development/tooling minor or patch lanes. Major npm and framework updates
+remain separate review work and are not auto-merged. GitHub Actions and Docker
+Dependabot behavior remains unchanged.
+
+A repository maintainer must approve workflow runs awaiting approval for every
+Dependabot or other bot PR before its required Actions checks can execute.
+Approve only the expected bot revision, then wait for the required checks and
+normal review policy before merging; do not treat workflow approval as a code
+approval.
