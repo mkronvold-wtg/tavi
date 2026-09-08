@@ -2,6 +2,18 @@
 # an expiration date. Dependabot tracks the pinned base-image digest; remove
 # these entries as soon as an upstream fixed package is available.
 vulnerabilities:
+  - id: CVE-2026-76642
+    statement: "Owner: platform. Trivy reports no fixed version for Debian 13 util-linux packages bsdutils/libblkid1/liblastlog2-2/libmount1/libsmartcols1 inherited from the latest pinned node:26-trixie-slim digest after apt-get upgrade. Compensating controls: digest-pinned base image, security upgrades during image build, and non-root runtime user. Review Debian and the base image weekly; remove when a fixed package is published."
+    expired_at: 2026-09-15
+  - id: CVE-2026-78408
+    statement: "Owner: platform. Trivy reports no fixed version for Debian 13 util-linux packages bsdutils/libblkid1/liblastlog2-2/libmount1/libsmartcols1 inherited from the latest pinned node:26-trixie-slim digest after apt-get upgrade. Compensating controls: digest-pinned base image, security upgrades during image build, and non-root runtime user. Review Debian and the base image weekly; remove when a fixed package is published."
+    expired_at: 2026-09-15
+  - id: CVE-2026-78409
+    statement: "Owner: platform. Trivy reports no fixed version for Debian 13 util-linux packages bsdutils/libblkid1/liblastlog2-2/libmount1/libsmartcols1 inherited from the latest pinned node:26-trixie-slim digest after apt-get upgrade. Compensating controls: digest-pinned base image, security upgrades during image build, and non-root runtime user. Review Debian and the base image weekly; remove when a fixed package is published."
+    expired_at: 2026-09-15
+  - id: CVE-2026-78410
+    statement: "Owner: platform. Trivy reports no fixed version for Debian 13 util-linux packages bsdutils/libblkid1/liblastlog2-2/libmount1/libsmartcols1 inherited from the latest pinned node:26-trixie-slim digest after apt-get upgrade. Compensating controls: digest-pinned base image, security upgrades during image build, and non-root runtime user. Review Debian and the base image weekly; remove when a fixed package is published."
+    expired_at: 2026-09-15
   - id: CVE-2026-39113
     statement: "Owner: platform. libsqlite3-0 3.46.1-7+deb13u1 is inherited from node:26-trixie-slim in API, web, and worker. Trivy reports no fixed version. Safe removal is blocked because essential util-linux pre-depends on liblastlog2-2, which depends on libsqlite3-0. Review the Debian package and base-image digest; remove when a fixed package is available."
     expired_at: 2026-09-15
