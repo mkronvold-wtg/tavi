@@ -28,7 +28,7 @@ spec:
         - name: regcred
       containers:
         - name: worker
-          image: repo.ops.e2open.com/dcops-docker-repo/tavi-worker:sha-69b0417@sha256:ee700eda62e8bacd79d0c225d463788e94064fc3275de983aededbe828deabf4
+          image: repo.ops.e2open.com/dcops-docker-repo/tavi-worker:v0.9.24@sha256:d717a1eb74634e8d7f8035fc1ed855abc62cd72d47719f9744b039e830a81448
           imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:

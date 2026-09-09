@@ -26,7 +26,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: migrate
-          image: repo.ops.e2open.com/dcops-docker-repo/tavi-api:sha-69b0417@sha256:05e049f92154a992e2f033a9967419e5a6611b6983b1f51ae44dad82c61dc376
+          image: repo.ops.e2open.com/dcops-docker-repo/tavi-api:v0.9.24@sha256:28365a18052802fe98c7b3ae63416911a1cd93e4c92cce91eb47d0ca67c22436
           imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:
@@ -78,7 +78,7 @@ spec:
         - name: regcred
       containers:
         - name: api
-          image: repo.ops.e2open.com/dcops-docker-repo/tavi-api:sha-69b0417@sha256:05e049f92154a992e2f033a9967419e5a6611b6983b1f51ae44dad82c61dc376
+          image: repo.ops.e2open.com/dcops-docker-repo/tavi-api:v0.9.24@sha256:28365a18052802fe98c7b3ae63416911a1cd93e4c92cce91eb47d0ca67c22436
           imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:
