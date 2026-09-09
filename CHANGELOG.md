@@ -12,6 +12,13 @@ Use optional markers under Unreleased to control the bump:
 
 - Added a fail-closed High/Critical Trivy scan on internal Artifactory publishes (`build-and-publish-internal` and `refresh-internal`) so a new finding fails the job and therefore `deploy-tavi-dev`.
 - Renewed 18 time-boxed Trivy ignores from 2026-08-31 to 2026-11-30, and added Fastify 5.12.0 exceptions for CVE-2026-16732 and CVE-2026-18504 (only fix is Fastify 6.0.0-alpha.0; NestJS 11 does not support it).
+- Remediated runtime CVEs: bumped pnpm overrides for `fast-uri` (3.1.6/4.1.3) and `mysql2` (3.22.0), rebuilt runtime images against a newer `node:26-trixie-slim` digest, and added four short-expiry, CVE-specific Trivy exceptions for unfixed Debian 13 util-linux packages.
+- Made `cut-release.yml` idempotent: it now detects an existing release branch/PR before creating one, and handles a race on push without overwriting a concurrent candidate.
+- Split the `npm-all` Dependabot group into `npm-production-runtime` and `npm-development-tooling`, both limited to minor/patch updates, and blocked npm semver-major PRs from auto-merging.
+- Remediated newly disclosed High-severity `js-yaml` (3.15.2/4.3.2) and `nodemailer` (9.1.1) CVEs.
+
+## 0.9.24 - 2026-08-28 - sha-f541c33
+
 - Made the Settings build-date timezone a clickable toggle between UTC and the browser's local time.
 - Documented GitHub Actions as a public GHCR/Compose vs private Artifactory/Kubernetes map in `docs/WORKFLOWS.md`.
 - Removed the unused Prisma CLI wrapper from the API runtime image. Production compose and Kubernetes migrate already invoke `node node_modules/prisma/build/index.js`.
