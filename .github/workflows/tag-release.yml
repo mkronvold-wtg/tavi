@@ -10,6 +10,14 @@ on:
       - "packages/config/src/app-version.ts"
       - "apps/**/package.json"
       - "packages/**/package.json"
+  # Safety net: GitHub's native auto-merge (and any GITHUB_TOKEN-authored push,
+  # e.g. from "Update behind pull requests" or a bot merging the release PR)
+  # never triggers `push`-based workflows. Without this, a release PR merged
+  # via auto-merge silently never gets tagged/published. This schedule
+  # self-heals by re-running the same idempotent detection on a timer; it is a
+  # no-op whenever the push trigger already handled tagging.
+  schedule:
+    - cron: "*/15 * * * *"
 
 concurrency:
   group: tag-release-${{ github.sha }}
