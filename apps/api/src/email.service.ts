@@ -160,8 +160,8 @@ export class EmailService implements OnModuleInit {
         host,
         port,
         secure,
-        auth,
-        tls: secure ? undefined : { rejectUnauthorized: false },
+        ...(auth ? { auth } : {}),
+        ...(secure ? {} : { tls: { rejectUnauthorized: false } }),
       });
 
       this.configured = true;

@@ -1,4 +1,4 @@
-FROM node:26-bookworm@sha256:0353e48e0e8a993db87b720c242f54b207059d1bcc0106534896e8a11054c837 AS builder
+FROM node:26-bookworm@sha256:e7bc1a4cd2419953c91f9a6f7bb6efb3737773093fb4ded0b1c77a0a5831fac4 AS builder
 
 WORKDIR /app
 ARG PNPM_VERSION=10.33.0
@@ -30,7 +30,7 @@ RUN ./node_modules/.bin/prisma generate \
     -o -n "$(find node_modules -type f -path '*/.prisma/client/default.js' | head -n 1)" \
   && test -n "$(find node_modules -name 'schema-engine-debian-openssl-3*' -type f | head -n 1)"
 
-FROM node:26-trixie-slim@sha256:1f42150ac9ff2ca8728e6eb2d3e597ee6ea8bb5fe7a3b748101565ce8cd02dc8 AS runtime
+FROM node:26-trixie-slim@sha256:14bf3eac4bf209d906d3c41256597d3ab1f926b2e93a79e9bdfe1efd32454239 AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
