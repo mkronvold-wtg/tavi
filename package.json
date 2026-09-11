@@ -1,6 +1,6 @@
 {
   "name": "tavi",
-  "version": "0.9.24",
+  "version": "0.9.25",
   "private": true,
   "engines": {
     "node": ">=26 <27"
