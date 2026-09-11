@@ -10,7 +10,7 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
-## 0.9.25 - 2026-09-11
+## 0.9.25 - 2026-09-11 - sha-0ce7bcd
 
 - Added a fail-closed High/Critical Trivy scan on internal Artifactory publishes (`build-and-publish-internal` and `refresh-internal`) so a new finding fails the job and therefore `deploy-tavi-dev`.
 - Renewed 18 time-boxed Trivy ignores from 2026-08-31 to 2026-11-30, and added Fastify 5.12.0 exceptions for CVE-2026-16732 and CVE-2026-18504 (only fix is Fastify 6.0.0-alpha.0; NestJS 11 does not support it).
