@@ -89,8 +89,8 @@ export class NotificationWorker {
         host,
         port,
         secure,
-        auth,
-        tls: secure ? undefined : { rejectUnauthorized: false },
+        ...(auth ? { auth } : {}),
+        ...(secure ? {} : { tls: { rejectUnauthorized: false } }),
       });
       this.configured = true;
       this.observability.logger.info("worker.notifications.transport_ready", {
