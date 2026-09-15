@@ -10,15 +10,16 @@ The `Backups` panel is the admin-facing control surface for scheduled backups, m
 
 ## What the panel shows
 
-| Area | What it does |
-| --- | --- |
-| Automatic Backups | Enables or disables the worker-driven backup schedule |
-| Backup time | Shows the daily backup time in your browser's local timezone and saves it in UTC when you use `Save` |
-| Upload Backup | Validates a Tavi backup JSON file and saves it into backup storage |
-| Backup Now | Creates a fresh backup immediately and saves it into backup storage |
-| Status grid | Shows the active backup directory, last success, last failure, and stored-backup count |
-| Stored Backups | Lists saved backup files with `Restore`, `Download`, and `Delete` controls |
-| Restore controls | Previews a stored backup, then applies a full or selective restore |
+| Area              | What it does                                                                                                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Automatic Backups | Enables or disables the worker-driven backup schedule                                                                          |
+| Backup time       | Shows the daily backup time in your browser's local timezone and saves it in UTC when you use `Save`                           |
+| Backup retention  | Keeps the newest backup per UTC day, ISO week, and month; defaults to 7 daily, 4 weekly, and 3 monthly                         |
+| Upload Backup     | Validates a Tavi backup JSON file and saves it into backup storage                                                             |
+| Backup Now        | Creates a fresh backup immediately and saves it into backup storage                                                            |
+| Status grid       | Shows the active backup directory, last success, last failure, stored-backup count, total storage, and active retention policy |
+| Restore controls  | Previews a stored backup, then applies a full or selective restore; controls open above the stored-backup list                 |
+| Stored Backups    | Lists saved backup files with `Protect`/`Unprotect`, `Restore`, `Download`, and `Delete` controls                              |
 
 ## Stored backup workflow
 
@@ -30,6 +31,18 @@ All backups now go through storage first.
 4. Restore preview and restore apply always run from a stored backup file.
 
 Visible backup timestamps such as `Last success`, `Last failure`, stored-backup modified times, and restore preview times use the browser's local timezone and include the timezone label.
+
+## Retention and protection
+
+Backup retention is configured in `Settings` -> `Backups` and applies to scheduled backups, manual `Backup Now` files, and uploaded backups. The default policy keeps:
+
+1. 7 daily buckets
+2. 4 weekly buckets
+3. 3 monthly buckets
+
+Each tier accepts a non-negative integer. `0` disables that tier. The retention pass sorts stored backups by modified timestamp newest-first, then file name for deterministic ties. It assigns at most one unprotected backup to each UTC calendar-day bucket, ISO-week bucket, and UTC calendar-month bucket, in that order, so the same unprotected file is not counted in multiple tiers.
+
+`Protect` stores per-file protection metadata in PostgreSQL. Protected backup files are excluded from automatic pruning until an admin chooses `Unprotect`; they still appear in total storage usage and can be restored, downloaded, or manually deleted. Deleting a file also removes its protection metadata, and missing-file metadata is cleaned up the next time the backup directory is scanned.
 
 ## Restore workflow
 
@@ -46,18 +59,19 @@ Visible backup timestamps such as `Last success`, `Last failure`, stored-backup 
 
 ## Restore scope behavior
 
-| Scope | What it changes |
-| --- | --- |
-| Full restore | Replaces the full Tavi dataset with the selected backup |
-| Projects and tasks only | Restores selected projects plus their tasks without replacing user records |
-| Users only | Restores selected users and role assignments without replacing projects or tasks |
+| Scope                   | What it changes                                                                  |
+| ----------------------- | -------------------------------------------------------------------------------- |
+| Full restore            | Replaces the full Tavi dataset with the selected backup                          |
+| Projects and tasks only | Restores selected projects plus their tasks without replacing user records       |
+| Users only              | Restores selected users and role assignments without replacing projects or tasks |
 
 Full backups include per-user task viewed state, so task-level unviewed-change highlights survive a full restore. Older backups that predate task viewed-state data are restored with existing active tasks treated as already viewed to avoid flooding users with old highlights. Legacy project viewed-state records may also be present in snapshots for compatibility, but current workspace highlighting is derived from task viewed state.
 
 ## Download and delete
 
 1. `Download` streams the selected stored backup JSON file to your browser.
-2. `Delete` removes the stored file from backup storage after confirmation.
+2. `Protect` or `Unprotect` toggles whether automatic retention pruning can remove the selected stored backup.
+3. `Delete` removes the stored file from backup storage after confirmation.
 
 Deleting a backup file does not change live workspace data. It only removes that stored snapshot from the backup directory.
 

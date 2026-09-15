@@ -913,6 +913,10 @@
   gap: 12px;
 }
 
+.backup-settings-switch {
+  justify-content: flex-start;
+}
+
 .settings-switch-label {
   color: var(--text-secondary);
   font-size: 0.9rem;
@@ -956,6 +960,26 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
+}
+
+.backup-retention-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--card-bg-muted);
+}
+
+.backup-retention-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.backup-retention-field input {
+  max-width: 90px;
 }
 
 .backup-upload-input {

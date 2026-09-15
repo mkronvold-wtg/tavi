@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   Req,
@@ -14,6 +15,7 @@ import {
   applyBackupRestoreSchema,
   previewBackupRestoreSchema,
   updateBackupSettingsSchema,
+  updateBackupProtectionSchema,
   uploadBackupFileSchema,
 } from '@tavi/schemas';
 import type { AuthenticatedRequest } from './auth.types';
@@ -79,6 +81,21 @@ export class BackupsController {
   ) {
     this.authService.requireAdminAccess(request.user!);
     return this.backupsService.deleteBackupFile(request.user!, fileName);
+  }
+
+  @Patch(':fileName/protection')
+  updateBackupProtection(
+    @Param('fileName') fileName: string,
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    this.authService.requireAdminAccess(request.user!);
+    const input = parseInput(updateBackupProtectionSchema, body);
+    return this.backupsService.updateBackupProtection(
+      request.user!,
+      fileName,
+      input,
+    );
   }
 
   @Post('restore/preview')

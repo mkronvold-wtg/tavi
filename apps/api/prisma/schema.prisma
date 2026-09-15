@@ -160,6 +160,7 @@ model User {
   notifications                NotificationEvent[]         @relation("NotificationRecipient")
   projectViewStates            ProjectViewState[]
   taskViewStates               TaskViewState[]
+  protectedBackupFiles         BackupFileProtection[]
   createdAt                    DateTime                    @default(now())
   updatedAt                    DateTime                    @updatedAt
 }
@@ -394,11 +395,23 @@ model BackupSettings {
 model RetentionSettings {
   id                    String   @id @default("global")
   backupRetention       String   @default("six_months")
+  backupDailyCount      Int      @default(7)
+  backupWeeklyCount     Int      @default(4)
+  backupMonthlyCount    Int      @default(3)
   loginRetention        String   @default("twelve_months")
   changeRetention       String   @default("twelve_months")
   notificationRetention String   @default("one_month")
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+}
+
+model BackupFileProtection {
+  fileName          String   @id
+  protectedAt       DateTime @default(now())
+  protectedByUserId String?
+  protectedBy       User?    @relation(fields: [protectedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([protectedByUserId])
 }
 
 model NotificationEvent {
