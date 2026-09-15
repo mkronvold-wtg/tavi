@@ -3616,6 +3616,9 @@ describe("App", () => {
           dragHandlesEnabled: true,
           enabled: false,
           guestAccessEnabled: true,
+          smtpUrl: "smtp://10.120.64.99:25",
+          fromAddress: "noreply@tavi.local",
+          homeUrl: "http://localhost:5173",
         }),
       );
       expect(emailNotificationsSwitch).not.toBeChecked();
@@ -3693,6 +3696,9 @@ describe("App", () => {
           dragHandlesEnabled: false,
           enabled: true,
           guestAccessEnabled: true,
+          smtpUrl: "smtp://10.120.64.99:25",
+          fromAddress: "noreply@tavi.local",
+          homeUrl: "http://localhost:5173",
         }),
       );
       expect(dragHandlesSwitch).not.toBeChecked();
@@ -3765,6 +3771,9 @@ describe("App", () => {
           dragHandlesEnabled: true,
           enabled: true,
           guestAccessEnabled: false,
+          smtpUrl: "smtp://10.120.64.99:25",
+          fromAddress: "noreply@tavi.local",
+          homeUrl: "http://localhost:5173",
         }),
       );
       expect(guestAccessSwitch).not.toBeChecked();
