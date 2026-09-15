@@ -68,6 +68,7 @@ import type {
   SavedViewPayload,
   SuccessResponse,
   UpdateBackupSettingsPayload,
+  UpdateBackupProtectionPayload,
   UpdateRetentionSettingsPayload,
   WorkspaceUserConfig,
   UploadBackupFileInput,
@@ -622,6 +623,15 @@ export const uploadBackupFile = (payload: UploadBackupFileInput) =>
 export const deleteBackupFile = (fileName: string) =>
   request<BackupStatus>(`/backups/${encodeURIComponent(fileName)}`, {
     method: "DELETE",
+  });
+
+export const updateBackupProtection = (
+  fileName: string,
+  payload: UpdateBackupProtectionPayload,
+) =>
+  request<BackupStatus>(`/backups/${encodeURIComponent(fileName)}/protection`, {
+    method: "PATCH",
+    body: payload,
   });
 
 export async function downloadBackupFile(fileName: string) {

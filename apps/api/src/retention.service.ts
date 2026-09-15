@@ -1,7 +1,8 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type {
-  BackupRetentionWindow,
+  BackupFileSummary,
+  BackupRetentionPolicy,
   LogRetentionWindow,
   NotificationRetentionWindow,
   PruneRetentionDataInput,
@@ -19,21 +20,31 @@ import { PrismaService } from './prisma.service';
 const RETENTION_SETTINGS_ID = 'global';
 const AUTOMATIC_RETENTION_PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 const DEFAULT_RETENTION_SETTINGS = {
-  backups: 'six_months',
   changes: 'twelve_months',
   logins: 'twelve_months',
   notifications: 'one_month',
 } as const satisfies UpdateRetentionSettingsInput;
+const DEFAULT_BACKUP_RETENTION_POLICY = {
+  dailyCount: 7,
+  monthlyCount: 3,
+  weeklyCount: 4,
+} as const satisfies BackupRetentionPolicy;
 
 type QueryMetricRow = {
   retainedCount: bigint | number | string | null;
   retainedSizeBytes: bigint | number | string | null;
 };
 type StoredRetentionSettingsRow = {
+  backupDailyCount: number | null;
+  backupMonthlyCount: number | null;
   backupRetention: string;
+  backupWeeklyCount: number | null;
   changeRetention: string;
   loginRetention: string;
   notificationRetention: string;
+};
+type ResolvedRetentionSettings = UpdateRetentionSettingsInput & {
+  backups: BackupRetentionPolicy;
 };
 
 @Injectable()
@@ -84,7 +95,10 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
       input,
     );
 
-    return this.buildRetentionStatus(input);
+    return this.buildRetentionStatus({
+      ...(await this.readResolvedRetentionSettings()),
+      ...input,
+    });
   }
 
   async pruneRetentionData(
@@ -143,7 +157,7 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async readResolvedRetentionSettings(): Promise<UpdateRetentionSettingsInput> {
+  private async readResolvedRetentionSettings(): Promise<ResolvedRetentionSettings> {
     const [settings, legacyAuditRetention] = await Promise.all([
       this.readStoredRetentionSettings(),
       this.prisma.auditLogRetention.findUnique({
@@ -156,9 +170,7 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
       : null;
 
     return {
-      backups: isBackupRetentionWindow(settings?.backupRetention)
-        ? settings.backupRetention
-        : DEFAULT_RETENTION_SETTINGS.backups,
+      backups: toBackupRetentionPolicy(settings),
       changes: isLogRetentionWindow(settings?.changeRetention)
         ? settings.changeRetention
         : (legacyLogRetention ?? DEFAULT_RETENTION_SETTINGS.changes),
@@ -177,7 +189,10 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
     const rows = await this.prisma.$queryRaw<StoredRetentionSettingsRow[]>(
       Prisma.sql`
         SELECT
+          "backupDailyCount",
+          "backupMonthlyCount",
           "backupRetention",
+          "backupWeeklyCount",
           "changeRetention",
           "loginRetention",
           "notificationRetention"
@@ -194,21 +209,18 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
     await this.prisma.$executeRaw(Prisma.sql`
       INSERT INTO "RetentionSettings" (
         "id",
-        "backupRetention",
         "loginRetention",
         "changeRetention",
         "notificationRetention"
       )
       VALUES (
         ${RETENTION_SETTINGS_ID},
-        ${input.backups},
         ${input.logins},
         ${input.changes},
         ${input.notifications}
       )
       ON CONFLICT ("id") DO UPDATE
       SET
-        "backupRetention" = EXCLUDED."backupRetention",
         "loginRetention" = EXCLUDED."loginRetention",
         "changeRetention" = EXCLUDED."changeRetention",
         "notificationRetention" = EXCLUDED."notificationRetention"
@@ -216,7 +228,7 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async buildRetentionStatus(
-    settings: UpdateRetentionSettingsInput,
+    settings: ResolvedRetentionSettings,
   ): Promise<RetentionStatus> {
     const [backups, logins, changes, notifications] = await Promise.all([
       this.estimateBackupRetention(settings.backups),
@@ -251,7 +263,7 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
 
   private async pruneTarget(
     target: RetentionTarget,
-    settings: UpdateRetentionSettingsInput,
+    settings: ResolvedRetentionSettings,
   ) {
     switch (target) {
       case 'backups':
@@ -267,7 +279,7 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
 
   private getPolicyForTarget(
     target: RetentionTarget,
-    settings: UpdateRetentionSettingsInput,
+    settings: ResolvedRetentionSettings,
   ) {
     switch (target) {
       case 'backups':
@@ -281,11 +293,11 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async estimateBackupRetention(policy: BackupRetentionWindow) {
-    const cutoff = buildBackupRetentionCutoff(new Date(), policy);
+  private async estimateBackupRetention(policy: BackupRetentionPolicy) {
     const backups = await this.backupsService.listStoredBackups();
-    const retainedBackups = backups.filter(
-      (backup) => cutoff === null || new Date(backup.modifiedAt) >= cutoff,
+    const retainedFileNames = selectRetainedBackupFileNames(backups, policy);
+    const retainedBackups = backups.filter((backup) =>
+      retainedFileNames.has(backup.fileName),
     );
 
     return {
@@ -297,10 +309,8 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private async pruneBackups(policy: BackupRetentionWindow) {
-    return this.backupsService.pruneStoredBackups(
-      buildBackupRetentionCutoff(new Date(), policy),
-    );
+  private async pruneBackups(policy: BackupRetentionPolicy) {
+    return this.backupsService.pruneStoredBackups(policy);
   }
 
   private async estimateLoginRetention(policy: LogRetentionWindow) {
@@ -548,15 +558,123 @@ function mapLegacyAuditRetentionWindow(olderThan: string): LogRetentionWindow {
   return 'three_months';
 }
 
-function isBackupRetentionWindow(value: string | null | undefined) {
-  return (
-    value === 'one_week' ||
-    value === 'two_weeks' ||
-    value === 'one_month' ||
-    value === 'three_months' ||
-    value === 'six_months' ||
-    value === 'forever'
+function normalizeRetentionCount(
+  value: number | null | undefined,
+  defaultValue: number,
+) {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+    ? value
+    : defaultValue;
+}
+
+function toBackupRetentionPolicy(
+  row: StoredRetentionSettingsRow | null,
+): BackupRetentionPolicy {
+  return {
+    dailyCount: normalizeRetentionCount(
+      row?.backupDailyCount,
+      DEFAULT_BACKUP_RETENTION_POLICY.dailyCount,
+    ),
+    monthlyCount: normalizeRetentionCount(
+      row?.backupMonthlyCount,
+      DEFAULT_BACKUP_RETENTION_POLICY.monthlyCount,
+    ),
+    weeklyCount: normalizeRetentionCount(
+      row?.backupWeeklyCount,
+      DEFAULT_BACKUP_RETENTION_POLICY.weeklyCount,
+    ),
+  };
+}
+
+function getUtcDayKey(value: string) {
+  return value.slice(0, 10);
+}
+
+function getUtcMonthKey(value: string) {
+  return value.slice(0, 7);
+}
+
+function getUtcWeekKey(value: string) {
+  const date = new Date(value);
+  const day = date.getUTCDay() || 7;
+  const thursday = new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate() + 4 - day,
+    ),
   );
+  const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(
+    ((thursday.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,
+  );
+
+  return `${thursday.getUTCFullYear()}-W${week.toString().padStart(2, '0')}`;
+}
+
+function addTierRetainedBackups(
+  retainedFileNames: Set<string>,
+  assignedBucketKeys: Set<string>,
+  backups: BackupFileSummary[],
+  count: number,
+  buildBucketKey: (modifiedAt: string) => string,
+) {
+  if (count === 0) {
+    return;
+  }
+
+  for (const backup of backups) {
+    if (retainedFileNames.has(backup.fileName) || backup.protected) {
+      continue;
+    }
+
+    const bucketKey = buildBucketKey(backup.modifiedAt);
+    if (assignedBucketKeys.has(bucketKey)) {
+      continue;
+    }
+
+    retainedFileNames.add(backup.fileName);
+    assignedBucketKeys.add(bucketKey);
+
+    if (assignedBucketKeys.size >= count) {
+      return;
+    }
+  }
+}
+
+function selectRetainedBackupFileNames(
+  backups: BackupFileSummary[],
+  policy: BackupRetentionPolicy,
+) {
+  const retainedFileNames = new Set(
+    backups
+      .filter((backup) => backup.protected)
+      .map((backup) => backup.fileName),
+  );
+
+  addTierRetainedBackups(
+    retainedFileNames,
+    new Set<string>(),
+    backups,
+    policy.dailyCount,
+    getUtcDayKey,
+  );
+  addTierRetainedBackups(
+    retainedFileNames,
+    new Set<string>(),
+    backups,
+    policy.weeklyCount,
+    getUtcWeekKey,
+  );
+  addTierRetainedBackups(
+    retainedFileNames,
+    new Set<string>(),
+    backups,
+    policy.monthlyCount,
+    getUtcMonthKey,
+  );
+
+  return retainedFileNames;
 }
 
 function isLogRetentionWindow(value: string | null | undefined) {
@@ -571,33 +689,6 @@ function isLogRetentionWindow(value: string | null | undefined) {
 
 function isNotificationRetentionWindow(value: string | null | undefined) {
   return value === 'one_week' || value === 'two_weeks' || value === 'one_month';
-}
-
-function buildBackupRetentionCutoff(
-  reference: Date,
-  policy: BackupRetentionWindow,
-) {
-  if (policy === 'forever') {
-    return null;
-  }
-
-  if (policy === 'one_week') {
-    return subtractUtcDays(reference, 7);
-  }
-
-  if (policy === 'two_weeks') {
-    return subtractUtcDays(reference, 14);
-  }
-
-  if (policy === 'one_month') {
-    return subtractUtcMonths(reference, 1);
-  }
-
-  if (policy === 'three_months') {
-    return subtractUtcMonths(reference, 3);
-  }
-
-  return subtractUtcMonths(reference, 6);
 }
 
 function buildLogRetentionCutoff(reference: Date, policy: LogRetentionWindow) {

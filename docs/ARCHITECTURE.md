@@ -28,22 +28,22 @@ This architecture assumes the approved full TypeScript stack decision.
 
 ## 3. Recommended Stack
 
-| Layer               | Recommendation                                                               | Notes                                                            |
-| ------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Package management  | `pnpm` workspaces                                                            | Fast installs and good monorepo support                          |
-| Build orchestration | `turbo`                                                                      | Optional but useful for caching and task coordination            |
-| Web app             | React + TypeScript + Vite                                                    | Good fit for a dense internal SPA                                |
-| Data fetching       | TanStack Query                                                               | Caching, invalidation, and optimistic updates                    |
+| Layer               | Recommendation                                                               | Notes                                                               |
+| ------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Package management  | `pnpm` workspaces                                                            | Fast installs and good monorepo support                             |
+| Build orchestration | `turbo`                                                                      | Optional but useful for caching and task coordination               |
+| Web app             | React + TypeScript + Vite                                                    | Good fit for a dense internal SPA                                   |
+| Data fetching       | TanStack Query                                                               | Caching, invalidation, and optimistic updates                       |
 | Table/view layer    | Native React table markup plus focused inline editors                        | Keeps the dense grouped workspace compact without extra abstraction |
-| Styling             | Hand-authored CSS with theme variables                                       | Compact control over density, themes, and row highlighting       |
-| Local UI state      | React state/hooks plus storage helpers                                       | Keeps expansion, filters, editors, and browser cache explicit    |
-| API                 | NestJS with Fastify adapter                                                  | Structured backend with strong TypeScript ergonomics             |
-| Validation          | Zod shared schemas                                                           | Reusable request/response and domain validation                  |
-| ORM                 | Prisma                                                                       | Type-safe data access and migration workflow                     |
-| Background jobs     | Dedicated Node worker polling PostgreSQL                                     | Handles imports, notifications, digests, reminders, and backups  |
-| Database            | PostgreSQL 16+                                                               | Reliable relational model for projects/tasks/imports             |
-| Testing             | Vitest, React Testing Library, Jest                                          | Web and API coverage for dense UI and service logic              |
-| Observability       | Structured logs + Prometheus metrics, with OpenTelemetry tracing added later | Good operational baseline without overbuilding the first release |
+| Styling             | Hand-authored CSS with theme variables                                       | Compact control over density, themes, and row highlighting          |
+| Local UI state      | React state/hooks plus storage helpers                                       | Keeps expansion, filters, editors, and browser cache explicit       |
+| API                 | NestJS with Fastify adapter                                                  | Structured backend with strong TypeScript ergonomics                |
+| Validation          | Zod shared schemas                                                           | Reusable request/response and domain validation                     |
+| ORM                 | Prisma                                                                       | Type-safe data access and migration workflow                        |
+| Background jobs     | Dedicated Node worker polling PostgreSQL                                     | Handles imports, notifications, digests, reminders, and backups     |
+| Database            | PostgreSQL 16+                                                               | Reliable relational model for projects/tasks/imports                |
+| Testing             | Vitest, React Testing Library, Jest                                          | Web and API coverage for dense UI and service logic                 |
+| Observability       | Structured logs + Prometheus metrics, with OpenTelemetry tracing added later | Good operational baseline without overbuilding the first release    |
 
 ## 4. Repository Layout
 
@@ -141,8 +141,11 @@ Recommended primary tables:
 - `email_settings`
 - `backup_settings`
 - `retention_settings`
+- `backup_file_protections`
 - `notification_events`
 - `notification_delivery_attempts`
+
+`retention_settings` keeps the legacy `backup_retention` window for upgrade compatibility and stores the active tiered backup policy as daily, weekly, and monthly bucket counts. The defaults are 7 daily, 4 weekly, and 3 monthly; zero disables a tier. `backup_file_protections` records protected stored-backup file names, the protection timestamp, and the admin user when available. It is intentionally database-backed rather than filesystem-backed so protection survives process restarts and shared Kubernetes volume remounts.
 
 ### projects
 
@@ -531,7 +534,9 @@ Distributed tracing can layer on later once the logging and metrics baseline is 
 Operational requirements:
 
 - Automated database migrations in deployment workflows using `prisma migrate deploy`
-- Backups for PostgreSQL
+- Tavi JSON backups on the shared backup volume with API and worker access
+- Tiered backup pruning after scheduled, manual, uploaded, and explicit prune operations
+- Protected backup files excluded from automatic pruning until an admin removes protection
 - Clear rollback path for app releases and schema changes
 
 ## 16. Performance and Reliability Targets

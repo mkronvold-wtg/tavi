@@ -2,17 +2,35 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { appVersion } from "@tavi/config";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import type { WorkerObservability } from "./worker-observability.js";
 
 const BACKUP_FORMAT = "tavi-backup-v1";
 const BACKUP_SETTINGS_ID = "global";
+const RETENTION_SETTINGS_ID = "global";
 const DEFAULT_IDLE_DELAY_MS = 30_000;
 const DEFAULT_SCHEDULE_INTERVAL_MS = 60_000;
+const DEFAULT_BACKUP_RETENTION_POLICY = {
+  dailyCount: 7,
+  monthlyCount: 3,
+  weeklyCount: 4,
+};
 
 type BackupWorkerOptions = {
   idleDelayMs?: number;
   scheduleIntervalMs?: number;
+};
+type BackupRetentionPolicy = typeof DEFAULT_BACKUP_RETENTION_POLICY;
+type StoredBackupFile = {
+  fileName: string;
+  modifiedAt: string;
+  protected: boolean;
+  sizeBytes: number;
+};
+type StoredRetentionSettingsRow = {
+  backupDailyCount: number | null;
+  backupMonthlyCount: number | null;
+  backupWeeklyCount: number | null;
 };
 
 function getDefaultBackupDirectory() {
@@ -77,6 +95,125 @@ function buildScheduledRunAt(now: Date, scheduleTime: string) {
 
 function toIsoOrNull(value: Date | null) {
   return value ? value.toISOString() : null;
+}
+
+function normalizeRetentionCount(
+  value: number | null | undefined,
+  defaultValue: number,
+) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0
+    ? value
+    : defaultValue;
+}
+
+function toBackupRetentionPolicy(
+  row: StoredRetentionSettingsRow | null,
+): BackupRetentionPolicy {
+  return {
+    dailyCount: normalizeRetentionCount(
+      row?.backupDailyCount,
+      DEFAULT_BACKUP_RETENTION_POLICY.dailyCount,
+    ),
+    monthlyCount: normalizeRetentionCount(
+      row?.backupMonthlyCount,
+      DEFAULT_BACKUP_RETENTION_POLICY.monthlyCount,
+    ),
+    weeklyCount: normalizeRetentionCount(
+      row?.backupWeeklyCount,
+      DEFAULT_BACKUP_RETENTION_POLICY.weeklyCount,
+    ),
+  };
+}
+
+function getUtcDayKey(value: string) {
+  return value.slice(0, 10);
+}
+
+function getUtcMonthKey(value: string) {
+  return value.slice(0, 7);
+}
+
+function getUtcWeekKey(value: string) {
+  const date = new Date(value);
+  const day = date.getUTCDay() || 7;
+  const thursday = new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate() + 4 - day,
+    ),
+  );
+  const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(
+    ((thursday.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,
+  );
+
+  return `${thursday.getUTCFullYear()}-W${week.toString().padStart(2, "0")}`;
+}
+
+function addTierRetainedBackups(
+  retainedFileNames: Set<string>,
+  assignedBucketKeys: Set<string>,
+  backups: StoredBackupFile[],
+  count: number,
+  buildBucketKey: (modifiedAt: string) => string,
+) {
+  if (count === 0) {
+    return;
+  }
+
+  for (const backup of backups) {
+    if (retainedFileNames.has(backup.fileName) || backup.protected) {
+      continue;
+    }
+
+    const bucketKey = buildBucketKey(backup.modifiedAt);
+    if (assignedBucketKeys.has(bucketKey)) {
+      continue;
+    }
+
+    retainedFileNames.add(backup.fileName);
+    assignedBucketKeys.add(bucketKey);
+
+    if (assignedBucketKeys.size >= count) {
+      return;
+    }
+  }
+}
+
+function selectRetainedBackupFileNames(
+  backups: StoredBackupFile[],
+  policy: BackupRetentionPolicy,
+) {
+  const retainedFileNames = new Set(
+    backups
+      .filter((backup) => backup.protected)
+      .map((backup) => backup.fileName),
+  );
+
+  addTierRetainedBackups(
+    retainedFileNames,
+    new Set<string>(),
+    backups,
+    policy.dailyCount,
+    getUtcDayKey,
+  );
+  addTierRetainedBackups(
+    retainedFileNames,
+    new Set<string>(),
+    backups,
+    policy.weeklyCount,
+    getUtcWeekKey,
+  );
+  addTierRetainedBackups(
+    retainedFileNames,
+    new Set<string>(),
+    backups,
+    policy.monthlyCount,
+    getUtcMonthKey,
+  );
+
+  return retainedFileNames;
 }
 
 export class BackupWorker {
@@ -158,6 +295,7 @@ export class BackupWorker {
 
     try {
       const backupDirectory = await this.writeBackupFile(currentTime);
+      const pruneResult = await this.pruneStoredBackups();
       await this.prisma.backupSettings.update({
         where: { id: BACKUP_SETTINGS_ID },
         data: {
@@ -167,6 +305,8 @@ export class BackupWorker {
       });
       this.observability.logger.info("worker.backups.created", {
         backupDirectory,
+        prunedBackupCount: pruneResult.deletedCount,
+        prunedBackupSizeBytes: pruneResult.deletedSizeBytes,
         scheduleTime: settings.scheduleTime,
         scheduledRunAt: scheduledRunAt.toISOString(),
       });
@@ -191,6 +331,179 @@ export class BackupWorker {
     }
   }
 
+  private async readRetentionSettings() {
+    const rows = await this.prisma.$queryRaw<
+      Array<
+        StoredRetentionSettingsRow & {
+          backupRetention: string;
+          changeRetention: string;
+          createdAt: Date;
+          id: string;
+          loginRetention: string;
+          notificationRetention: string;
+          updatedAt: Date;
+        }
+      >
+    >(Prisma.sql`
+      SELECT
+        "id",
+        "backupDailyCount",
+        "backupMonthlyCount",
+        "backupRetention",
+        "backupWeeklyCount",
+        "loginRetention",
+        "changeRetention",
+        "notificationRetention",
+        "createdAt",
+        "updatedAt"
+      FROM "RetentionSettings"
+      WHERE "id" = ${RETENTION_SETTINGS_ID}
+      LIMIT 1
+    `);
+    const row = rows[0];
+
+    if (!row) {
+      return {
+        backupDailyCount: DEFAULT_BACKUP_RETENTION_POLICY.dailyCount,
+        backupMonthlyCount: DEFAULT_BACKUP_RETENTION_POLICY.monthlyCount,
+        backupRetention: "six_months",
+        backupWeeklyCount: DEFAULT_BACKUP_RETENTION_POLICY.weeklyCount,
+        changeRetention: "twelve_months",
+        createdAt: new Date().toISOString(),
+        id: RETENTION_SETTINGS_ID,
+        loginRetention: "twelve_months",
+        notificationRetention: "one_month",
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    const policy = toBackupRetentionPolicy(row);
+    return {
+      backupDailyCount: policy.dailyCount,
+      backupMonthlyCount: policy.monthlyCount,
+      backupRetention: row.backupRetention,
+      backupWeeklyCount: policy.weeklyCount,
+      changeRetention: row.changeRetention,
+      createdAt: row.createdAt.toISOString(),
+      id: row.id,
+      loginRetention: row.loginRetention,
+      notificationRetention: row.notificationRetention,
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  private async readBackupRetentionPolicy() {
+    const rows = await this.prisma.$queryRaw<StoredRetentionSettingsRow[]>(
+      Prisma.sql`
+        SELECT
+          "backupDailyCount",
+          "backupMonthlyCount",
+          "backupWeeklyCount"
+        FROM "RetentionSettings"
+        WHERE "id" = ${RETENTION_SETTINGS_ID}
+        LIMIT 1
+      `,
+    );
+
+    return toBackupRetentionPolicy(rows[0] ?? null);
+  }
+
+  private async listStoredBackups(directory: string) {
+    const entries = await fs.readdir(directory, { withFileTypes: true });
+    const backupFiles = await Promise.all(
+      entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+        .map(async (entry) => {
+          const filePath = path.join(directory, entry.name);
+          const stats = await fs.stat(filePath);
+
+          return {
+            fileName: entry.name,
+            modifiedAt: stats.mtime.toISOString(),
+            protected: false,
+            sizeBytes: stats.size,
+          };
+        }),
+    );
+    const protections = await this.prisma.backupFileProtection.findMany({
+      where: {
+        fileName: {
+          in: backupFiles.map((backup) => backup.fileName),
+        },
+      },
+      select: {
+        fileName: true,
+      },
+    });
+    const protectedFileNames = new Set(
+      protections.map((protection) => protection.fileName),
+    );
+    const backups = backupFiles.map((backup) => ({
+      ...backup,
+      protected: protectedFileNames.has(backup.fileName),
+    }));
+
+    backups.sort(
+      (left, right) =>
+        right.modifiedAt.localeCompare(left.modifiedAt) ||
+        right.fileName.localeCompare(left.fileName),
+    );
+
+    await this.prisma.backupFileProtection.deleteMany({
+      where:
+        backups.length > 0
+          ? { fileName: { notIn: backups.map((backup) => backup.fileName) } }
+          : {},
+    });
+
+    return backups;
+  }
+
+  private async pruneStoredBackups() {
+    const directory = await resolveBackupDirectory();
+    const [policy, backups] = await Promise.all([
+      this.readBackupRetentionPolicy(),
+      this.listStoredBackups(directory),
+    ]);
+    const retainedFileNames = selectRetainedBackupFileNames(backups, policy);
+    let deletedCount = 0;
+    let deletedSizeBytes = 0;
+
+    for (const backup of backups) {
+      if (backup.protected || retainedFileNames.has(backup.fileName)) {
+        continue;
+      }
+
+      await fs
+        .unlink(path.join(directory, backup.fileName))
+        .catch((error: unknown) => {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+            return;
+          }
+
+          throw error;
+        });
+      deletedCount += 1;
+      deletedSizeBytes += backup.sizeBytes;
+    }
+
+    if (deletedCount > 0) {
+      const remainingBackups = await this.listStoredBackups(directory);
+      await this.prisma.backupFileProtection.deleteMany({
+        where:
+          remainingBackups.length > 0
+            ? {
+                fileName: {
+                  notIn: remainingBackups.map((backup) => backup.fileName),
+                },
+              }
+            : {},
+      });
+    }
+
+    return { deletedCount, deletedSizeBytes };
+  }
+
   private async writeBackupFile(now: Date) {
     const directory = await resolveBackupDirectory();
 
@@ -198,12 +511,15 @@ export class BackupWorker {
       users,
       roleAssignments,
       projects,
+      projectViewStates,
+      taskViewStates,
       tasks,
       savedViews,
       importJobs,
       importRows,
       auditEvents,
       auditLogRetention,
+      retentionSettings,
       emailSettings,
       backupSettings,
       notificationEvents,
@@ -212,6 +528,8 @@ export class BackupWorker {
       this.prisma.user.findMany({ orderBy: { createdAt: "asc" } }),
       this.prisma.roleAssignment.findMany({ orderBy: { createdAt: "asc" } }),
       this.prisma.project.findMany({ orderBy: { createdAt: "asc" } }),
+      this.prisma.projectViewState.findMany({ orderBy: { createdAt: "asc" } }),
+      this.prisma.taskViewState.findMany({ orderBy: { createdAt: "asc" } }),
       this.prisma.task.findMany({ orderBy: { createdAt: "asc" } }),
       this.prisma.savedView.findMany({ orderBy: { createdAt: "asc" } }),
       this.prisma.importJob.findMany({ orderBy: { createdAt: "asc" } }),
@@ -220,6 +538,7 @@ export class BackupWorker {
       this.prisma.auditLogRetention.findUnique({
         where: { id: "global" },
       }),
+      this.readRetentionSettings(),
       this.prisma.emailSettings.findUnique({ where: { id: "global" } }),
       this.prisma.backupSettings.findUnique({
         where: { id: BACKUP_SETTINGS_ID },
@@ -369,6 +688,22 @@ export class BackupWorker {
           title: project.title,
           updatedAt: project.updatedAt.toISOString(),
         })),
+        projectViewStates: projectViewStates.map((viewState) => ({
+          createdAt: viewState.createdAt.toISOString(),
+          id: viewState.id,
+          projectId: viewState.projectId,
+          updatedAt: viewState.updatedAt.toISOString(),
+          userId: viewState.userId,
+          viewedAt: viewState.viewedAt.toISOString(),
+        })),
+        taskViewStates: taskViewStates.map((viewState) => ({
+          createdAt: viewState.createdAt.toISOString(),
+          id: viewState.id,
+          taskId: viewState.taskId,
+          updatedAt: viewState.updatedAt.toISOString(),
+          userId: viewState.userId,
+        })),
+        retentionSettings,
         roleAssignments: roleAssignments.map((assignment) => ({
           createdAt: assignment.createdAt.toISOString(),
           id: assignment.id,
