@@ -33,6 +33,7 @@ import type {
   UpdateLoopImportRowDecisionsInput,
   UpdateEmailSettingsInput,
   UpdateBackupSettingsInput,
+  UpdateBackupProtectionInput,
   WorkspaceUserConfig,
 } from "@tavi/schemas";
 
@@ -425,6 +426,7 @@ export type UpdateNotificationPreferencesPayload =
   UpdateNotificationPreferencesInput;
 
 export type UpdateBackupSettingsPayload = UpdateBackupSettingsInput;
+export type UpdateBackupProtectionPayload = UpdateBackupProtectionInput;
 
 export type PreviewBackupRestorePayload = {
   source: ApplyBackupRestoreInput["source"];

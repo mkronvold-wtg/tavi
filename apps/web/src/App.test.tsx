@@ -67,7 +67,11 @@ const createRetentionStatusPayload = (
 ): RetentionStatus => ({
   backups: {
     estimatedSizeBytes: 5_242_880,
-    policy: "six_months",
+    policy: {
+      dailyCount: 7,
+      monthlyCount: 3,
+      weeklyCount: 4,
+    },
     retainedItemCount: 8,
   },
   changes: {
@@ -1200,7 +1204,9 @@ describe("App", () => {
       expect(screen.getByLabelText("Search")).toHaveValue("Roadmap");
       expect(screen.getByLabelText("Group by")).toHaveValue("status");
       expect(
-        screen.getByText("Current Search").closest(".saved-view-current-search"),
+        screen
+          .getByText("Current Search")
+          .closest(".saved-view-current-search"),
       ).toHaveTextContent("Roadmap");
       expect(
         screen.getByRole("button", { name: "Sort by: 1 Progress" }),
@@ -3456,7 +3462,11 @@ describe("App", () => {
     expect(screen.getByRole("main")).toHaveClass("workspace-shell--full-width");
 
     const reloadedThemeCycle = [
-      { buttonLabel: "Ocean", expectedLabel: "Forest", expectedTheme: "forest" },
+      {
+        buttonLabel: "Ocean",
+        expectedLabel: "Forest",
+        expectedTheme: "forest",
+      },
       {
         buttonLabel: "Forest",
         expectedLabel: "Autumn",
@@ -3509,7 +3519,11 @@ describe("App", () => {
       },
     ] as const;
 
-    for (const { buttonLabel, expectedLabel, expectedTheme } of reloadedThemeCycle) {
+    for (const {
+      buttonLabel,
+      expectedLabel,
+      expectedTheme,
+    } of reloadedThemeCycle) {
       fireEvent.click(
         within(reloadedThemeCard!).getByRole("button", { name: buttonLabel }),
       );
@@ -3519,7 +3533,9 @@ describe("App", () => {
           expectedTheme,
         );
         expect(
-          within(reloadedThemeCard!).getByRole("button", { name: expectedLabel }),
+          within(reloadedThemeCard!).getByRole("button", {
+            name: expectedLabel,
+          }),
         ).toBeInTheDocument();
       });
     }
@@ -4084,7 +4100,9 @@ describe("App", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    fireEvent.click(screen.getByText("Local Accounts").closest(".settings-item")!);
+    fireEvent.click(
+      screen.getByText("Local Accounts").closest(".settings-item")!,
+    );
 
     await waitFor(() => {
       expect(
@@ -4134,11 +4152,6 @@ describe("App", () => {
           updateRequests.push(payload);
           return createResponse(
             createRetentionStatusPayload({
-              backups: {
-                estimatedSizeBytes: 5_242_880,
-                policy: payload.backups,
-                retainedItemCount: 8,
-              },
               changes: {
                 estimatedSizeBytes: 131_072,
                 policy: payload.changes,
@@ -4200,7 +4213,7 @@ describe("App", () => {
       ).not.toBeInTheDocument();
       const element = screen
         .getByText(
-          "Control how long backups and admin-visible logs stay in storage.",
+          "Control how long admin-visible logs stay in storage. Backup retention is configured from Settings → Backups.",
         )
         .closest("section");
 
@@ -4213,9 +4226,12 @@ describe("App", () => {
         "Sizes reflect what would remain if each retention rule were applied now.",
       ),
     ).toBeInTheDocument();
+    expect(
+      within(panel).queryByLabelText("Backups retention"),
+    ).not.toBeInTheDocument();
     await waitFor(() => {
       expect(
-        within(panel).getByText(/5\.0 MB across 8 backups\./),
+        within(panel).getByLabelText("Notifications retention"),
       ).toBeInTheDocument();
     });
 
@@ -4226,7 +4242,6 @@ describe("App", () => {
     await waitFor(() => {
       expect(updateRequests).toEqual([
         {
-          backups: "six_months",
           changes: "twelve_months",
           logins: "twelve_months",
           notifications: "two_weeks",
@@ -4249,7 +4264,9 @@ describe("App", () => {
     const pruneDialog = await screen.findByRole("dialog", {
       name: "Prune notifications",
     });
-    fireEvent.click(within(pruneDialog).getByRole("button", { name: "Prune now" }));
+    fireEvent.click(
+      within(pruneDialog).getByRole("button", { name: "Prune now" }),
+    );
 
     await waitFor(() => {
       expect(pruneRequests).toEqual(["notifications"]);
@@ -4524,9 +4541,7 @@ describe("App", () => {
       expect(
         screen.getByPlaceholderText("Current password"),
       ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Save" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
     });
   });
 
@@ -5469,7 +5484,9 @@ describe("App", () => {
     fireEvent.click(within(kickoffRow!).getByRole("button", { name: "Edit" }));
 
     expect(patchCount).toBe(0);
-    expect(within(projectCard).getByDisplayValue("Kickoff")).toBeInTheDocument();
+    expect(
+      within(projectCard).getByDisplayValue("Kickoff"),
+    ).toBeInTheDocument();
 
     fireEvent.change(within(projectCard).getByDisplayValue("Kickoff"), {
       target: { value: "Kickoff updated" },

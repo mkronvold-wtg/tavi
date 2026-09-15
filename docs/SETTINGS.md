@@ -33,9 +33,9 @@ Saving profile edits closes the panel after the update is accepted.
 | ---------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Admin-only | Email Notifications | Controls the global outbound email switch                                                                                               |
 | Admin-only | Task Drag Handles   | Shows or hides manual task-reorder handles for every user in the workspace                                                              |
-| Admin-only | Backups             | Opens the dedicated backup and restore panel                                                                                            |
+| Admin-only | Backups             | Opens the dedicated backup, restore, storage usage, tiered retention, and per-file protection panel                                     |
 | Admin-only | Import/Export       | Opens the dedicated import and export panel                                                                                             |
-| Admin-only | Retention           | Opens retention controls for backups, login history, change history, and notification history                                           |
+| Admin-only | Retention           | Opens retention controls for login history, change history, and notification history                                                    |
 | Admin-only | Local Accounts      | Opens the local-auth management panel                                                                                                   |
 | Admin-only | Audit Logins        | Opens system-wide sign-in audit history                                                                                                 |
 | Admin-only | Audit Notifications | Opens system-wide outbound notification and email delivery history                                                                      |
@@ -50,7 +50,8 @@ Saving profile edits closes the panel after the update is accepted.
 4. Turn on `Daily Digest` if you want one scheduled summary email instead of immediate task and project update, assignment, and due-date emails, then save the time shown in your browser's local timezone.
 5. Leave `Task Drag Handles` on when editors should be able to manually reorder visible task lists, or turn it off for cleaner review-only sessions.
 6. Use the `Import/Export` and `Backups` launcher cards when you need data-management tools without keeping those panels open all the time.
-7. Use `Retention` when you want to prune stored backups or older login, change, and notification history based on the current policy estimates.
+7. Use `Backups` when you want to review backup storage usage, set the 7 daily / 4 weekly / 3 monthly retention policy, protect individual backup files, or restore from storage.
+8. Use `Retention` when you want to prune older login, change, and notification history based on the current policy estimates.
 
 ## Local Accounts entry point
 
@@ -81,7 +82,7 @@ It does not delete projects, tasks, imports, backups, accounts, or saved views.
 ## Related panels launched from Settings
 
 1. [`IMPORT_EXPORT.md`](./IMPORT_EXPORT.md) covers exports, CSV import staging, import review, and workspace reset.
-2. [`BACKUPS.md`](./BACKUPS.md) covers scheduled backups, backup-now, upload, restore, download, and delete.
+2. [`BACKUPS.md`](./BACKUPS.md) covers scheduled backups, backup-now, upload, storage usage, tiered backup retention, protection, restore, download, and delete.
 3. [`LOCAL_ACCOUNTS.md`](./LOCAL_ACCOUNTS.md) covers local-auth account management.
 4. [`AUDIT_HISTORY.md`](./AUDIT_HISTORY.md) covers audit timelines and filters.
 

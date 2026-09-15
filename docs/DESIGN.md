@@ -15,6 +15,7 @@ The product is optimized for review-heavy team workflows where people need to sc
 3. Support fast review conversations with compact layouts, inline editing, and collapse/expand controls.
 4. Make large worklists manageable through filtering, sorting, regrouping, and saved views.
 5. Provide a practical migration path from existing Loop exports.
+6. Keep operational recovery simple with visible backup storage usage, tiered backup retention, and explicit protection for must-keep snapshots.
 
 ## 3. Non-Goals for v1
 
@@ -97,6 +98,16 @@ An import job records a Loop CSV or export-based migration event, including vali
 ### Audit Event
 
 An audit event records meaningful changes such as status changes, task reordering, field edits, overrides, and imports.
+
+### Backup Retention Policy
+
+Backup retention is a workspace-level operational policy configured from `Settings` -> `Backups`.
+
+- Defaults: 7 daily, 4 weekly, and 3 monthly retained buckets.
+- Each tier is an integer count; `0` disables that tier.
+- Selection is deterministic by stored-file modified timestamp in UTC: newest file per UTC day, ISO week, and UTC month, assigned daily first, then weekly, then monthly.
+- Protected backup files are excluded from automatic pruning until unprotected.
+- Total backup storage is visible beside the active policy so admins can discuss retention without leaving the backup panel.
 
 ## 6. Status Model
 
