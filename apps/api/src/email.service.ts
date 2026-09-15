@@ -32,10 +32,7 @@ const EMAIL_AUDIT_SYSTEM_ACTOR = {
 };
 
 function maskSmtpPassword(value: string) {
-  return value.replace(
-    /(\bsmtps?:\/\/[^/\s:@]+):([^@\s/]*)@/gi,
-    '$1:***@',
-  );
+  return value.replace(/(\bsmtps?:\/\/[^/\s:@]+):([^@\s/]*)@/gi, '$1:***@');
 }
 
 function mergeSmtpUrl(
@@ -689,11 +686,13 @@ export class EmailService implements OnModuleInit {
     });
   }
 
-  private getEffectiveConfig(settings: {
-    smtpUrl?: string | null;
-    fromAddress?: string | null;
-    homeUrl?: string | null;
-  } | null) {
+  private getEffectiveConfig(
+    settings: {
+      smtpUrl?: string | null;
+      fromAddress?: string | null;
+      homeUrl?: string | null;
+    } | null,
+  ) {
     return {
       smtpUrl: settings?.smtpUrl ?? process.env.SMTP_URL ?? DEFAULT_SMTP_URL,
       fromAddress:
@@ -730,7 +729,8 @@ export class EmailService implements OnModuleInit {
     } catch (error) {
       this.transporter = null;
       this.configured = false;
-      this.configurationIssue = error instanceof Error ? error.message : String(error);
+      this.configurationIssue =
+        error instanceof Error ? error.message : String(error);
     }
   }
 }
