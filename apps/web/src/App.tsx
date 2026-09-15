@@ -5950,8 +5950,22 @@ function SettingsPanel({
   smtpStatus,
 }: SettingsPanelProps) {
   const [emailPrefError, setEmailPrefError] = useState<string | null>(null);
+  const [emailConfig, setEmailConfig] = useState({
+    smtpUrl: smtpStatus?.smtpUrl ?? "",
+    fromAddress: smtpStatus?.fromAddress ?? "",
+    homeUrl: smtpStatus?.homeUrl ?? "",
+  });
 
   const queryClient = useQueryClient();
+  useEffect(() => {
+    if (smtpStatus) {
+      setEmailConfig({
+        smtpUrl: smtpStatus.smtpUrl,
+        fromAddress: smtpStatus.fromAddress,
+        homeUrl: smtpStatus.homeUrl,
+      });
+    }
+  }, [smtpStatus]);
   const smtpServer =
     smtpStatus?.host && smtpStatus.port != null
       ? `${smtpStatus.secure ? "smtps" : "smtp"}://${smtpStatus.host}:${smtpStatus.port}`
@@ -5988,6 +6002,9 @@ function SettingsPanel({
               dragHandlesEnabled: variables.dragHandlesEnabled,
               enabled: variables.enabled,
               guestAccessEnabled: variables.guestAccessEnabled,
+              smtpUrl: variables.smtpUrl ?? current.smtpUrl,
+              fromAddress: variables.fromAddress ?? current.fromAddress,
+              homeUrl: variables.homeUrl ?? current.homeUrl,
             }
           : current,
       );
@@ -6021,6 +6038,7 @@ function SettingsPanel({
       dragHandlesEnabled: smtpStatus.dragHandlesEnabled,
       enabled: !smtpStatus.enabled,
       guestAccessEnabled: smtpStatus.guestAccessEnabled,
+      ...emailConfig,
     });
   };
   const toggleDragHandles = () => {
@@ -6032,6 +6050,7 @@ function SettingsPanel({
       dragHandlesEnabled: !smtpStatus.dragHandlesEnabled,
       enabled: smtpStatus.enabled,
       guestAccessEnabled: smtpStatus.guestAccessEnabled,
+      ...emailConfig,
     });
   };
   const toggleGuestAccess = () => {
@@ -6043,6 +6062,7 @@ function SettingsPanel({
       dragHandlesEnabled: smtpStatus.dragHandlesEnabled,
       enabled: smtpStatus.enabled,
       guestAccessEnabled: !smtpStatus.guestAccessEnabled,
+      ...emailConfig,
     });
   };
 
@@ -6087,11 +6107,11 @@ function SettingsPanel({
           onClick={toggleEmailNotifications}
         >
           <div className="settings-item-header">
-            <strong>Email Notifications</strong>
+            <strong>Email config</strong>
             <span>{emailEnabled ? "On" : "Off"}</span>
           </div>
           <p className="toolbar-hint">
-            Enable or disable all Tavi email delivery for every user.
+            Configure SMTP delivery and workspace email notifications.
           </p>
           {emailPrefError ? (
             <p className="error-banner">{emailPrefError}</p>
@@ -6110,6 +6130,59 @@ function SettingsPanel({
               type="checkbox"
             />
           </label>
+          <label className="settings-field">
+            <span>SMTP URL ({smtpStatus?.smtpUrlSource ?? "environment"})</span>
+            <input
+              value={emailConfig.smtpUrl}
+              onChange={(event) =>
+                setEmailConfig((current) => ({
+                  ...current,
+                  smtpUrl: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="settings-field">
+            <span>From address ({smtpStatus?.fromAddressSource ?? "environment"})</span>
+            <input
+              type="email"
+              value={emailConfig.fromAddress}
+              onChange={(event) =>
+                setEmailConfig((current) => ({
+                  ...current,
+                  fromAddress: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="settings-field">
+            <span>Home URL ({smtpStatus?.homeUrlSource ?? "environment"})</span>
+            <input
+              type="url"
+              value={emailConfig.homeUrl}
+              onChange={(event) =>
+                setEmailConfig((current) => ({
+                  ...current,
+                  homeUrl: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <button
+            className="button-secondary"
+            disabled={emailSettingsMutation.isPending || !smtpStatus}
+            onClick={() =>
+              emailSettingsMutation.mutate({
+                ...emailConfig,
+                dragHandlesEnabled: smtpStatus?.dragHandlesEnabled ?? true,
+                enabled: smtpStatus?.enabled ?? true,
+                guestAccessEnabled: smtpStatus?.guestAccessEnabled ?? true,
+              })
+            }
+            type="button"
+          >
+            {emailSettingsMutation.isPending ? "Saving..." : "Save email config"}
+          </button>
         </div>
         <div
           className="settings-item settings-item-toggle"

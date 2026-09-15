@@ -19,6 +19,7 @@ import { PrismaService } from './prisma.service';
 
 const DEFAULT_SMTP_URL = 'smtp://10.120.64.99:25';
 const DEFAULT_SMTP_FROM = 'noreply@tavi.local';
+const DEFAULT_HOME_URL = 'http://localhost:5173';
 const EMAIL_SETTINGS_ID = 'global';
 const PASSWORD_RESET_EMAIL_UNAVAILABLE_MESSAGE =
   'Password reset email is unavailable right now';
@@ -29,6 +30,24 @@ const EMAIL_AUDIT_SYSTEM_ACTOR = {
   name: 'Tavi System',
   role: 'admin' as const,
 };
+
+function maskSmtpPassword(value: string) {
+  return value.replace(
+    /(\bsmtps?:\/\/[^/\s:@]+):([^@\s/]*)@/gi,
+    '$1:***@',
+  );
+}
+
+function mergeSmtpUrl(
+  input: string | undefined,
+  existing: string | null | undefined,
+) {
+  if (!input || !input.includes(':***@') || !existing) {
+    return input;
+  }
+  const password = existing.match(/:[^/@]*@/)?.[0];
+  return password ? input.replace(':***@', password) : input;
+}
 
 type EmailRecipient = {
   email: string;
@@ -135,6 +154,7 @@ export class EmailService implements OnModuleInit {
   private smtpHost: string | null = null;
   private smtpPort: number | null = null;
   private smtpSecure = false;
+  private smtpUrl = '';
   private fromAddress: string = DEFAULT_SMTP_FROM;
   private homeUrl: string = 'http://localhost:5173';
   private configured = false;
@@ -147,6 +167,7 @@ export class EmailService implements OnModuleInit {
 
   onModuleInit() {
     const smtpUrl = process.env.SMTP_URL ?? DEFAULT_SMTP_URL;
+    this.smtpUrl = smtpUrl;
     this.fromAddress = process.env.SMTP_FROM ?? DEFAULT_SMTP_FROM;
     this.homeUrl = process.env.TAVI_HOME_URL ?? 'http://localhost:5173';
 
@@ -187,6 +208,8 @@ export class EmailService implements OnModuleInit {
 
   async getSmtpStatus(): Promise<SmtpStatus> {
     const settings = await this.readEmailSettings();
+    const effective = this.getEffectiveConfig(settings);
+    this.configureTransport(effective.smtpUrl, effective.fromAddress);
 
     return {
       dragHandlesEnabled: settings?.dragHandlesEnabled ?? true,
@@ -196,7 +219,12 @@ export class EmailService implements OnModuleInit {
       host: this.smtpHost,
       port: this.smtpPort,
       secure: this.smtpSecure,
-      fromAddress: this.fromAddress,
+      fromAddress: effective.fromAddress,
+      smtpUrl: maskSmtpPassword(effective.smtpUrl),
+      homeUrl: effective.homeUrl,
+      smtpUrlSource: settings?.smtpUrl ? 'database' : 'environment',
+      fromAddressSource: settings?.fromAddress ? 'database' : 'environment',
+      homeUrlSource: settings?.homeUrl ? 'database' : 'environment',
     };
   }
 
@@ -204,6 +232,7 @@ export class EmailService implements OnModuleInit {
     input: UpdateEmailSettingsInput,
   ): Promise<SmtpStatus> {
     const guestAccessEnabled = input.guestAccessEnabled === true;
+    const existing = await this.readEmailSettings();
 
     await this.prisma.emailSettings.upsert({
       where: { id: EMAIL_SETTINGS_ID },
@@ -211,12 +240,21 @@ export class EmailService implements OnModuleInit {
         dragHandlesEnabled: input.dragHandlesEnabled,
         enabled: input.enabled,
         guestAccessEnabled,
+        smtpUrl: mergeSmtpUrl(
+          input.smtpUrl,
+          existing?.smtpUrl ?? process.env.SMTP_URL,
+        ),
+        fromAddress: input.fromAddress ?? existing?.fromAddress ?? null,
+        homeUrl: input.homeUrl ?? existing?.homeUrl ?? null,
       },
       create: {
         dragHandlesEnabled: input.dragHandlesEnabled,
         id: EMAIL_SETTINGS_ID,
         enabled: input.enabled,
         guestAccessEnabled,
+        smtpUrl: input.smtpUrl ?? null,
+        fromAddress: input.fromAddress ?? null,
+        homeUrl: input.homeUrl ?? null,
       },
     });
 
@@ -230,6 +268,9 @@ export class EmailService implements OnModuleInit {
       dragHandlesEnabled: settings?.dragHandlesEnabled ?? true,
       enabled,
       guestAccessEnabled: settings?.guestAccessEnabled ?? true,
+      smtpUrl: settings?.smtpUrl ?? undefined,
+      fromAddress: settings?.fromAddress ?? undefined,
+      homeUrl: settings?.homeUrl ?? undefined,
     });
   }
 
@@ -355,6 +396,11 @@ export class EmailService implements OnModuleInit {
       | 'password reset email',
     options?: ReadyTransportOptions,
   ): Promise<ReadyTransportResult> {
+    const settings = await this.readEmailSettings();
+    const effective = this.getEffectiveConfig(settings);
+    this.homeUrl = effective.homeUrl;
+    this.configureTransport(effective.smtpUrl, effective.fromAddress);
+
     if (!this.transporter) {
       if (options?.throwWhenUnavailable) {
         throw new ServiceUnavailableException(
@@ -374,8 +420,6 @@ export class EmailService implements OnModuleInit {
     }
 
     if (!options?.ignoreEmailEnabled) {
-      const settings = await this.readEmailSettings();
-
       if (settings?.enabled === false) {
         if (options?.throwWhenUnavailable) {
           throw new ServiceUnavailableException(
@@ -638,8 +682,56 @@ export class EmailService implements OnModuleInit {
         dragHandlesEnabled: true,
         enabled: true,
         guestAccessEnabled: true,
+        smtpUrl: true,
+        fromAddress: true,
+        homeUrl: true,
       },
     });
+  }
+
+  private getEffectiveConfig(settings: {
+    smtpUrl?: string | null;
+    fromAddress?: string | null;
+    homeUrl?: string | null;
+  } | null) {
+    return {
+      smtpUrl: settings?.smtpUrl ?? process.env.SMTP_URL ?? DEFAULT_SMTP_URL,
+      fromAddress:
+        settings?.fromAddress ?? process.env.SMTP_FROM ?? DEFAULT_SMTP_FROM,
+      homeUrl:
+        settings?.homeUrl ?? process.env.TAVI_HOME_URL ?? DEFAULT_HOME_URL,
+    };
+  }
+
+  private configureTransport(smtpUrl: string, fromAddress: string) {
+    if (
+      (smtpUrl === this.smtpUrl ||
+        (this.smtpUrl === '' && this.transporter !== null)) &&
+      fromAddress === this.fromAddress
+    ) {
+      return;
+    }
+    this.smtpUrl = smtpUrl;
+    this.fromAddress = fromAddress;
+    try {
+      const { auth, host, port, secure } = parseSmtpUrl(smtpUrl);
+      this.smtpHost = host;
+      this.smtpPort = port;
+      this.smtpSecure = secure;
+      this.transporter = createTransport({
+        host,
+        port,
+        secure,
+        ...(auth ? { auth } : {}),
+        ...(secure ? {} : { tls: { rejectUnauthorized: false } }),
+      });
+      this.configured = true;
+      this.configurationIssue = null;
+    } catch (error) {
+      this.transporter = null;
+      this.configured = false;
+      this.configurationIssue = error instanceof Error ? error.message : String(error);
+    }
   }
 }
 

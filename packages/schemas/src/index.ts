@@ -2372,6 +2372,9 @@ export const updateEmailSettingsSchema = z.object({
   enabled: z.boolean(),
   dragHandlesEnabled: z.boolean(),
   guestAccessEnabled: z.boolean(),
+  smtpUrl: z.string().trim().min(1).optional(),
+  fromAddress: z.string().trim().email().optional(),
+  homeUrl: z.string().trim().url().optional(),
 });
 export type UpdateEmailSettingsInput = z.infer<
   typeof updateEmailSettingsSchema
@@ -2482,6 +2485,11 @@ export const smtpStatusSchema = z.object({
   port: z.number().int().nullable(),
   secure: z.boolean(),
   fromAddress: z.string(),
+  smtpUrl: z.string(),
+  homeUrl: z.string().url(),
+  smtpUrlSource: z.enum(["database", "environment"]),
+  fromAddressSource: z.enum(["database", "environment"]),
+  homeUrlSource: z.enum(["database", "environment"]),
   dragHandlesEnabled: z.boolean(),
   guestAccessEnabled: z.boolean(),
 });
