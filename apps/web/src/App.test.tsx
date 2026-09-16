@@ -3598,6 +3598,16 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
 
+    expect(
+      screen.queryByRole("switch", { name: "Email Notifications" }),
+    ).not.toBeInTheDocument();
+    const emailConfigCard = screen
+      .getByText("Email config")
+      .closest(".settings-item");
+
+    expect(emailConfigCard).not.toBeNull();
+    fireEvent.click(emailConfigCard as HTMLElement);
+
     await waitFor(() => {
       expect(screen.getByText("smtp://10.120.64.99:25")).toBeInTheDocument();
     });
@@ -3678,6 +3688,12 @@ describe("App", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const emailConfigCard = screen
+      .getByText("Email config")
+      .closest(".settings-item");
+
+    expect(emailConfigCard).not.toBeNull();
+    fireEvent.click(emailConfigCard as HTMLElement);
 
     const dragHandlesSwitch = screen.getByRole("switch", {
       name: "Task Drag Handles",
@@ -3753,7 +3769,12 @@ describe("App", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const emailConfigCard = screen
+      .getByText("Email config")
+      .closest(".settings-item");
 
+    expect(emailConfigCard).not.toBeNull();
+    fireEvent.click(emailConfigCard as HTMLElement);
     const guestAccessSwitch = screen.getByRole("switch", {
       name: "Guest Access",
     });
@@ -4062,24 +4083,65 @@ describe("App", () => {
     );
 
     expect(settingsItems).not.toHaveLength(0);
-    expect(settingsItems).toHaveLength(10);
-    expect(settingsItems[0]?.textContent).toContain("Email Notifications");
-    expect(settingsItems[1]?.textContent).toContain("Task Drag Handles");
-    expect(settingsItems[2]?.textContent).toContain("Guest Access");
-    expect(settingsItems[3]?.textContent).toContain("Backups");
-    expect(settingsItems[4]?.textContent).toContain("Retention");
-    expect(settingsItems[5]?.textContent).toContain("Import/Export");
-    expect(settingsItems[6]?.textContent).toContain("Local Accounts");
-    expect(settingsItems[7]?.textContent).toContain("Audit logins");
-    expect(settingsItems[8]?.textContent).toContain("Audit notifications");
-    expect(settingsItems[9]?.textContent).toContain("Audit changes");
+    expect(settingsItems).toHaveLength(8);
+    expect(settingsItems[0]?.textContent).toContain("Email config");
+    expect(settingsItems[1]?.textContent).toContain("Backups");
+    expect(settingsItems[2]?.textContent).toContain("Retention");
+    expect(settingsItems[3]?.textContent).toContain("Import/Export");
+    expect(settingsItems[4]?.textContent).toContain("Local Accounts");
+    expect(settingsItems[5]?.textContent).toContain("Audit logins");
+    expect(settingsItems[6]?.textContent).toContain("Audit notifications");
+    expect(settingsItems[7]?.textContent).toContain("Audit changes");
     expect(
       screen.getByRole("link", { name: "tavi local build" }),
     ).toHaveAttribute("href", `${appRepositoryUrl}/blob/main/CHANGELOG.md`);
     expect(screen.getByText("built local build")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("switch", { name: "Email Notifications" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("switch", { name: "Task Drag Handles" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("switch", { name: "Guest Access" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(settingsItems[0] as HTMLElement);
+
     await waitFor(() => {
+      expect(
+        screen.queryByText(
+          "Workspace-wide admin controls, tools, and system reports.",
+        ),
+      ).not.toBeInTheDocument();
       expect(screen.getByText("smtp://10.120.64.99:25")).toBeInTheDocument();
       expect(screen.getByText("noreply@tavi.local")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("switch", { name: "Email Notifications" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { name: "Task Drag Handles" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { name: "Guest Access" }),
+    ).toBeInTheDocument();
+
+    const emailPanel = screen
+      .getByText("Configure SMTP delivery and workspace email settings.")
+      .closest(".workspace-panel-card");
+
+    expect(emailPanel).not.toBeNull();
+    fireEvent.click(
+      within(emailPanel as HTMLElement).getByRole("button", { name: "Close" }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(
+          "Configure SMTP delivery and workspace email settings.",
+        ),
+      ).not.toBeInTheDocument();
     });
   });
 
