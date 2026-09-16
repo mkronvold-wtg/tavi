@@ -8,8 +8,6 @@ import {
 } from "./api";
 import { Modal } from "./Modal";
 import type {
-  BackupRetentionSummary,
-  BackupRetentionWindow,
   LogRetentionSummary,
   LogRetentionWindow,
   NotificationRetentionSummary,
@@ -18,18 +16,6 @@ import type {
   RetentionTarget,
   UpdateRetentionSettingsPayload,
 } from "./types";
-
-const BACKUP_RETENTION_OPTIONS: Array<{
-  label: string;
-  value: BackupRetentionWindow;
-}> = [
-  { label: "1 week", value: "one_week" },
-  { label: "2 weeks", value: "two_weeks" },
-  { label: "1 month", value: "one_month" },
-  { label: "3 months", value: "three_months" },
-  { label: "6 months", value: "six_months" },
-  { label: "Forever", value: "forever" },
-];
 
 const LOG_RETENTION_OPTIONS: Array<{
   label: string;
@@ -140,7 +126,9 @@ export function RetentionSettingsPanel({
     const policyLabel = formatCurrentPolicyLabel(target, retentionDraft);
 
     setPendingPruneTarget(target);
-    setMessage(`Ready to prune ${formatRetentionTargetLabel(target)} older than ${policyLabel}.`);
+    setMessage(
+      `Ready to prune ${formatRetentionTargetLabel(target)} older than ${policyLabel}.`,
+    );
   };
 
   const confirmPrune = () => {
@@ -159,7 +147,8 @@ export function RetentionSettingsPanel({
         <div>
           <strong>Retention</strong>
           <p className="toolbar-hint">
-            Control how long backups and admin-visible logs stay in storage.
+            Control how long admin-visible logs stay in storage. Backup
+            retention is configured from Settings → Backups.
           </p>
         </div>
         <div className="settings-actions">
@@ -192,21 +181,6 @@ export function RetentionSettingsPanel({
 
       {status ? (
         <div className="retention-list">
-          <RetentionRow
-            actionLabel={
-              pruneMutation.isPending &&
-              pruneMutation.variables?.target === "backups"
-                ? "Pruning..."
-                : "Prune now"
-            }
-            controlsDisabled={controlsDisabled}
-            estimate={formatEstimate(status.backups, "backup")}
-            label="Backups"
-            onChange={(value) => handleRetentionChange("backups", value)}
-            onPrune={() => handlePrune("backups")}
-            options={BACKUP_RETENTION_OPTIONS}
-            value={status.backups.policy}
-          />
           <RetentionRow
             actionLabel={
               pruneMutation.isPending &&
@@ -319,8 +293,8 @@ function RetentionPruneModal({
       }
     >
       <p className="toolbar-hint">
-        This removes retained {formatRetentionTargetLabel(target)} older than the
-        current retention policy.
+        This removes retained {formatRetentionTargetLabel(target)} older than
+        the current retention policy.
       </p>
     </Modal>
   );
@@ -387,7 +361,6 @@ function toRetentionDraft(status: RetentionStatus | undefined) {
   }
 
   return {
-    backups: status.backups.policy,
     changes: status.changes.policy,
     logins: status.logins.policy,
     notifications: status.notifications.policy,
@@ -395,10 +368,7 @@ function toRetentionDraft(status: RetentionStatus | undefined) {
 }
 
 function formatEstimate(
-  summary:
-    | BackupRetentionSummary
-    | LogRetentionSummary
-    | NotificationRetentionSummary,
+  summary: LogRetentionSummary | NotificationRetentionSummary,
   itemLabel: string,
 ) {
   return `${formatBytes(summary.estimatedSizeBytes)} across ${formatCountLabel(summary.retainedItemCount, itemLabel)}.`;
@@ -443,7 +413,7 @@ function formatCurrentPolicyLabel(
 ) {
   switch (target) {
     case "backups":
-      return formatPolicyLabel(draft.backups, BACKUP_RETENTION_OPTIONS);
+      return "the backup policy in Backups";
     case "logins":
       return formatPolicyLabel(draft.logins, LOG_RETENTION_OPTIONS);
     case "changes":
