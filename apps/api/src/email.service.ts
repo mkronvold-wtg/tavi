@@ -79,6 +79,15 @@ type ReadyTransportResult = {
   transporter: Transporter<SMTPTransport.SentMessageInfo> | null;
 };
 
+type EmailSettingsRecord = {
+  dragHandlesEnabled: boolean;
+  enabled: boolean;
+  guestAccessEnabled: boolean;
+  smtpUrl: string | null;
+  fromAddress: string | null;
+  homeUrl: string | null;
+};
+
 function buildPasswordEmailBody(password: string, homeUrl: string): string {
   return `Your account password has been set. Use the password below to sign in.
 
@@ -204,7 +213,7 @@ export class EmailService implements OnModuleInit {
   }
 
   async getSmtpStatus(): Promise<SmtpStatus> {
-    const settings = await this.readEmailSettings();
+    const settings: EmailSettingsRecord | null = await this.readEmailSettings();
     const effective = this.getEffectiveConfig(settings);
     this.configureTransport(effective.smtpUrl, effective.fromAddress);
 
@@ -229,7 +238,7 @@ export class EmailService implements OnModuleInit {
     input: UpdateEmailSettingsInput,
   ): Promise<SmtpStatus> {
     const guestAccessEnabled = input.guestAccessEnabled === true;
-    const existing = await this.readEmailSettings();
+    const existing: EmailSettingsRecord | null = await this.readEmailSettings();
 
     await this.prisma.emailSettings.upsert({
       where: { id: EMAIL_SETTINGS_ID },
@@ -259,7 +268,7 @@ export class EmailService implements OnModuleInit {
   }
 
   async setEmailEnabled(enabled: boolean): Promise<SmtpStatus> {
-    const settings = await this.readEmailSettings();
+    const settings: EmailSettingsRecord | null = await this.readEmailSettings();
 
     return this.updateEmailSettings({
       dragHandlesEnabled: settings?.dragHandlesEnabled ?? true,
@@ -393,7 +402,7 @@ export class EmailService implements OnModuleInit {
       | 'password reset email',
     options?: ReadyTransportOptions,
   ): Promise<ReadyTransportResult> {
-    const settings = await this.readEmailSettings();
+    const settings: EmailSettingsRecord | null = await this.readEmailSettings();
     const effective = this.getEffectiveConfig(settings);
     this.homeUrl = effective.homeUrl;
     this.configureTransport(effective.smtpUrl, effective.fromAddress);
@@ -672,8 +681,8 @@ export class EmailService implements OnModuleInit {
     return `${details.join('. ')}.`;
   }
 
-  private readEmailSettings() {
-    return this.prisma.emailSettings.findUnique({
+  private async readEmailSettings(): Promise<EmailSettingsRecord | null> {
+    const settings = await this.prisma.emailSettings.findUnique({
       where: { id: EMAIL_SETTINGS_ID },
       select: {
         dragHandlesEnabled: true,
@@ -684,15 +693,11 @@ export class EmailService implements OnModuleInit {
         homeUrl: true,
       },
     });
+
+    return settings as EmailSettingsRecord | null;
   }
 
-  private getEffectiveConfig(
-    settings: {
-      smtpUrl?: string | null;
-      fromAddress?: string | null;
-      homeUrl?: string | null;
-    } | null,
-  ) {
+  private getEffectiveConfig(settings: EmailSettingsRecord | null) {
     return {
       smtpUrl: settings?.smtpUrl ?? process.env.SMTP_URL ?? DEFAULT_SMTP_URL,
       fromAddress:
