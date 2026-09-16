@@ -31,11 +31,11 @@ Saving profile edits closes the panel after the update is accepted.
 
 | Section    | Setting             | What it changes                                                                                                                         |
 | ---------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Admin-only | Email Notifications | Controls the global outbound email switch                                                                                               |
+| Admin-only | Email config       | Controls the global outbound email switch and edits SMTP URL, from address, and home URL                                              |
 | Admin-only | Task Drag Handles   | Shows or hides manual task-reorder handles for every user in the workspace                                                              |
-| Admin-only | Backups             | Opens the dedicated backup and restore panel                                                                                            |
+| Admin-only | Backups             | Opens the dedicated backup, restore, storage usage, tiered retention, and per-file protection panel                                     |
 | Admin-only | Import/Export       | Opens the dedicated import and export panel                                                                                             |
-| Admin-only | Retention           | Opens retention controls for backups, login history, change history, and notification history                                           |
+| Admin-only | Retention           | Opens retention controls for login history, change history, and notification history                                                    |
 | Admin-only | Local Accounts      | Opens the local-auth management panel                                                                                                   |
 | Admin-only | Audit Logins        | Opens system-wide sign-in audit history                                                                                                 |
 | Admin-only | Audit Notifications | Opens system-wide outbound notification and email delivery history                                                                      |
@@ -50,7 +50,8 @@ Saving profile edits closes the panel after the update is accepted.
 4. Turn on `Daily Digest` if you want one scheduled summary email instead of immediate task and project update, assignment, and due-date emails, then save the time shown in your browser's local timezone.
 5. Leave `Task Drag Handles` on when editors should be able to manually reorder visible task lists, or turn it off for cleaner review-only sessions.
 6. Use the `Import/Export` and `Backups` launcher cards when you need data-management tools without keeping those panels open all the time.
-7. Use `Retention` when you want to prune stored backups or older login, change, and notification history based on the current policy estimates.
+7. Use `Backups` when you want to review backup storage usage, set the 7 daily / 4 weekly / 3 monthly retention policy, protect individual backup files, or restore from storage.
+8. Use `Retention` when you want to prune older login, change, and notification history based on the current policy estimates.
 
 ## Local Accounts entry point
 
@@ -81,7 +82,7 @@ It does not delete projects, tasks, imports, backups, accounts, or saved views.
 ## Related panels launched from Settings
 
 1. [`IMPORT_EXPORT.md`](./IMPORT_EXPORT.md) covers exports, CSV import staging, import review, and workspace reset.
-2. [`BACKUPS.md`](./BACKUPS.md) covers scheduled backups, backup-now, upload, restore, download, and delete.
+2. [`BACKUPS.md`](./BACKUPS.md) covers scheduled backups, backup-now, upload, storage usage, tiered backup retention, protection, restore, download, and delete.
 3. [`LOCAL_ACCOUNTS.md`](./LOCAL_ACCOUNTS.md) covers local-auth account management.
 4. [`AUDIT_HISTORY.md`](./AUDIT_HISTORY.md) covers audit timelines and filters.
 
@@ -92,5 +93,6 @@ It does not delete projects, tasks, imports, backups, accounts, or saved views.
 3. `Daily Digest` applies only to non-admin notification emails. Administrative account emails still send immediately when global email is enabled, and password-reset emails still send whenever SMTP is configured even if `Email Notifications` is off.
 4. Admin-only email controls do not force users into digest mode or pick a send time for them. Each user chooses whether non-admin notifications arrive immediately or in the daily digest and saves their own digest time.
 5. New users default to digest off and a stored UTC digest time of `11:00`, which corresponds to `5:00 AM` CST.
-6. `Personal ToDo` opens from `User Profile` after the account card. Its `hide done` preference is still reset by `Reset all user settings`.
-7. `Audit Changes` intentionally excludes outbound email-delivery steps. Use `Audit Notifications` when you need the notification timeline or test-email diagnostics.
+6. `Email config` uses `SMTP_URL`, `SMTP_FROM`, and `TAVI_HOME_URL` from the environment by default. Values saved by an administrator in the database override the corresponding environment values. SMTP passwords are masked in the browser; leaving a masked password unchanged preserves the stored credential.
+7. `Personal ToDo` opens from `User Profile` after the account card. Its `hide done` preference is still reset by `Reset all user settings`.
+8. `Audit Changes` intentionally excludes outbound email-delivery steps. Use `Audit Notifications` when you need the notification timeline or test-email diagnostics.

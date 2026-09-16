@@ -887,6 +887,13 @@ export const backupRetentionWindowSchema = z.enum([
 ]);
 export type BackupRetentionWindow = z.infer<typeof backupRetentionWindowSchema>;
 
+export const backupRetentionPolicySchema = z.object({
+  dailyCount: z.number().int().nonnegative(),
+  monthlyCount: z.number().int().nonnegative(),
+  weeklyCount: z.number().int().nonnegative(),
+});
+export type BackupRetentionPolicy = z.infer<typeof backupRetentionPolicySchema>;
+
 export const logRetentionWindowSchema = z.enum([
   "three_months",
   "six_months",
@@ -919,7 +926,7 @@ const retentionMetricsSchema = z.object({
 });
 
 export const backupRetentionSummarySchema = retentionMetricsSchema.extend({
-  policy: backupRetentionWindowSchema,
+  policy: backupRetentionPolicySchema,
 });
 export type BackupRetentionSummary = z.infer<
   typeof backupRetentionSummarySchema
@@ -948,7 +955,6 @@ export const retentionStatusSchema = z.object({
 export type RetentionStatus = z.infer<typeof retentionStatusSchema>;
 
 export const updateRetentionSettingsSchema = z.object({
-  backups: backupRetentionWindowSchema,
   changes: logRetentionWindowSchema,
   logins: logRetentionWindowSchema,
   notifications: notificationRetentionWindowSchema,
@@ -2366,6 +2372,9 @@ export const updateEmailSettingsSchema = z.object({
   enabled: z.boolean(),
   dragHandlesEnabled: z.boolean(),
   guestAccessEnabled: z.boolean(),
+  smtpUrl: z.string().trim().min(1).optional(),
+  fromAddress: z.string().trim().email().optional(),
+  homeUrl: z.string().trim().url().optional(),
 });
 export type UpdateEmailSettingsInput = z.infer<
   typeof updateEmailSettingsSchema
@@ -2476,6 +2485,11 @@ export const smtpStatusSchema = z.object({
   port: z.number().int().nullable(),
   secure: z.boolean(),
   fromAddress: z.string(),
+  smtpUrl: z.string(),
+  homeUrl: z.string().url(),
+  smtpUrlSource: z.enum(["database", "environment"]),
+  fromAddressSource: z.enum(["database", "environment"]),
+  homeUrlSource: z.enum(["database", "environment"]),
   dragHandlesEnabled: z.boolean(),
   guestAccessEnabled: z.boolean(),
 });
@@ -2485,6 +2499,9 @@ export const backupFileSummarySchema = z.object({
   createdAt: z.string().min(1),
   fileName: z.string().min(1),
   modifiedAt: z.string().min(1),
+  protected: z.boolean(),
+  protectedAt: z.string().nullable(),
+  protectedByName: z.string().nullable(),
   sizeBytes: z.number().int().nonnegative(),
 });
 export type BackupFileSummary = z.infer<typeof backupFileSummarySchema>;
@@ -2498,16 +2515,26 @@ export const backupStatusSchema = z.object({
   lastFailureAt: z.string().nullable(),
   lastScheduledRunAt: z.string().nullable(),
   lastSuccessAt: z.string().nullable(),
+  retentionPolicy: backupRetentionPolicySchema,
   scheduleTime: timeOfDaySchema,
+  totalSizeBytes: z.number().int().nonnegative(),
 });
 export type BackupStatus = z.infer<typeof backupStatusSchema>;
 
 export const updateBackupSettingsSchema = z.object({
   enabled: z.boolean(),
+  retentionPolicy: backupRetentionPolicySchema.optional(),
   scheduleTime: timeOfDaySchema,
 });
 export type UpdateBackupSettingsInput = z.infer<
   typeof updateBackupSettingsSchema
+>;
+
+export const updateBackupProtectionSchema = z.object({
+  protected: z.boolean(),
+});
+export type UpdateBackupProtectionInput = z.infer<
+  typeof updateBackupProtectionSchema
 >;
 
 export const uploadBackupFileSchema = z.object({
@@ -2584,9 +2611,12 @@ export const backupSnapshotCountsSchema = z.object({
   notificationDeliveryAttempts: z.number().int().nonnegative(),
   notificationEvents: z.number().int().nonnegative(),
   projects: z.number().int().nonnegative(),
+  projectViewStates: z.number().int().nonnegative(),
+  retentionSettings: z.number().int().nonnegative(),
   roleAssignments: z.number().int().nonnegative(),
   savedViews: z.number().int().nonnegative(),
   tasks: z.number().int().nonnegative(),
+  taskViewStates: z.number().int().nonnegative(),
   users: z.number().int().nonnegative(),
 });
 export type BackupSnapshotCounts = z.infer<typeof backupSnapshotCountsSchema>;

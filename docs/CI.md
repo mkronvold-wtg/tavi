@@ -186,6 +186,25 @@ When the weekly cut reports an existing release branch or release PR:
    branch after recording why; then run a new cut from the current default
    branch. Do not use this path to bypass security remediation.
 
+### Auto-merge and the `Tag release` push trigger
+
+GitHub's native auto-merge always completes the merge as `github-actions[bot]`
+using the repository's `GITHUB_TOKEN`. By design, GitHub Actions never fires
+`push`-triggered workflows for commits pushed that way (it prevents workflow
+recursion), so a release PR that lands via auto-merge (or via the
+`Update behind pull requests` bot flow) does **not** trigger `Tag release`
+even though the merge commit changes `package.json`/`CHANGELOG.md`. A human
+merging the same PR through the UI or `gh pr merge` (without `--auto`) does
+not hit this restriction.
+
+`Tag release` therefore also runs on a 15-minute `schedule` as a self-healing
+safety net, in addition to `push`. Its detection logic is idempotent (it exits
+early if the tag already exists), so the scheduled runs are a no-op except
+when a release landed without a working `push` trigger. If a weekly release
+still doesn't get tagged within ~15 minutes of the release PR merging, check
+`gh run list --workflow tag-release.yml` for the scheduled run's outcome
+before assuming the release is stuck.
+
 ## Image evidence and version promotion
 
 Every published image receives BuildKit SBOM and provenance attestations.

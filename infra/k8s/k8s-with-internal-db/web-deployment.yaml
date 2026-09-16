@@ -24,7 +24,7 @@ spec:
         - name: regcred
       containers:
         - name: web
-          image: repo.ops.e2open.com/dcops-docker-repo/tavi-web:sha-69b0417@sha256:0cbb2372de0b38b0dc73c37bc936ee3f7dc1be988a55918f8e19b63bda6053ee
+          image: repo.ops.e2open.com/dcops-docker-repo/tavi-web:v0.9.24@sha256:1a750484328db342632b58f22f1835c8b52ef024972e469808b63e06081a42af
           imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:

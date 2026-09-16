@@ -96,12 +96,18 @@ describe('RetentionService', () => {
         createdAt: '2026-04-01T00:00:00.000Z',
         fileName: 'backup-1.json',
         modifiedAt: '2026-04-10T00:00:00.000Z',
+        protected: false,
+        protectedAt: null,
+        protectedByName: null,
         sizeBytes: 512,
       },
       {
         createdAt: '2025-01-01T00:00:00.000Z',
         fileName: 'backup-2.json',
         modifiedAt: '2025-01-01T00:00:00.000Z',
+        protected: false,
+        protectedAt: null,
+        protectedByName: null,
         sizeBytes: 256,
       },
     ]);
@@ -128,9 +134,13 @@ describe('RetentionService', () => {
     expect(mocks.requireAdminAccessMock).toHaveBeenCalledWith(actor);
     expect(result).toEqual({
       backups: {
-        estimatedSizeBytes: 512,
-        policy: 'six_months',
-        retainedItemCount: 1,
+        estimatedSizeBytes: 768,
+        policy: {
+          dailyCount: 7,
+          monthlyCount: 3,
+          weeklyCount: 4,
+        },
+        retainedItemCount: 2,
       },
       changes: {
         estimatedSizeBytes: 300,
@@ -161,7 +171,6 @@ describe('RetentionService', () => {
 
     const result = await service.updateRetentionSettings(
       {
-        backups: 'forever',
         changes: 'twenty_four_months',
         logins: 'thirty_six_months',
         notifications: 'two_weeks',
@@ -177,14 +186,71 @@ describe('RetentionService', () => {
       actor.id,
       'retention_settings_updated',
       {
-        backups: 'forever',
         changes: 'twenty_four_months',
         logins: 'thirty_six_months',
         notifications: 'two_weeks',
       },
     );
-    expect(result.backups.policy).toBe('forever');
+    expect(result.backups.policy).toEqual({
+      dailyCount: 7,
+      monthlyCount: 3,
+      weeklyCount: 4,
+    });
     expect(result.notifications.policy).toBe('two_weeks');
+  });
+
+  it('prunes backups with the resolved tiered retention policy', async () => {
+    const { service, mocks } = createService();
+
+    mocks.auditLogRetentionFindUniqueMock.mockResolvedValue(null);
+    mocks.pruneStoredBackupsMock.mockResolvedValue({
+      deletedCount: 2,
+      deletedSizeBytes: 1024,
+    });
+    mocks.listStoredBackupsMock.mockResolvedValue([]);
+    mocks.queryRawMock
+      .mockResolvedValueOnce([
+        {
+          backupDailyCount: 1,
+          backupMonthlyCount: 0,
+          backupRetention: 'six_months',
+          backupWeeklyCount: 2,
+          changeRetention: 'twelve_months',
+          loginRetention: 'twelve_months',
+          notificationRetention: 'one_month',
+        },
+      ])
+      .mockResolvedValue([
+        { retainedCount: BigInt(0), retainedSizeBytes: BigInt(0) },
+      ]);
+
+    const result = await service.pruneRetentionData(
+      { target: 'backups' },
+      actor,
+    );
+
+    expect(mocks.pruneStoredBackupsMock).toHaveBeenCalledWith({
+      dailyCount: 1,
+      monthlyCount: 0,
+      weeklyCount: 2,
+    });
+    expect(mocks.recordAuditMock).toHaveBeenCalledWith(
+      actor,
+      'auth',
+      actor.id,
+      'retention_pruned',
+      {
+        deletedCount: 2,
+        deletedSizeBytes: 1024,
+        policy: {
+          dailyCount: 1,
+          monthlyCount: 0,
+          weeklyCount: 2,
+        },
+        target: 'backups',
+      },
+    );
+    expect(result.deletedCount).toBe(2);
   });
 
   it('prunes notification retention across audit events, notifications, and attempts', async () => {
@@ -199,6 +265,9 @@ describe('RetentionService', () => {
       .mockResolvedValueOnce([
         {
           backupRetention: 'six_months',
+          backupDailyCount: 7,
+          backupMonthlyCount: 3,
+          backupWeeklyCount: 4,
           changeRetention: 'twelve_months',
           loginRetention: 'twelve_months',
           notificationRetention: 'one_month',
@@ -261,7 +330,11 @@ describe('RetentionService', () => {
       settings: {
         backups: {
           estimatedSizeBytes: 0,
-          policy: 'six_months',
+          policy: {
+            dailyCount: 7,
+            monthlyCount: 3,
+            weeklyCount: 4,
+          },
           retainedItemCount: 0,
         },
         changes: {

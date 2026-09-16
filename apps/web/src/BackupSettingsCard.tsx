@@ -10,6 +10,7 @@ import {
   previewBackupRestore,
   resetWorkspaceExamples,
   updateBackupSettings,
+  updateBackupProtection,
   uploadBackupFile,
 } from "./api";
 import { Modal } from "./Modal";
@@ -57,6 +58,11 @@ export function BackupSettingsCard({
   const [backupError, setBackupError] = useState<string | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [scheduleDraft, setScheduleDraft] = useState("02:00");
+  const [retentionDraft, setRetentionDraft] = useState({
+    dailyCount: 7,
+    monthlyCount: 3,
+    weeklyCount: 4,
+  });
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreConfirmationOpen, setRestoreConfirmationOpen] = useState(false);
   const [selectedStoredFileName, setSelectedStoredFileName] = useState("");
@@ -99,6 +105,7 @@ export function BackupSettingsCard({
     setScheduleDraft(
       utcTimeToLocalTime(backupStatusQuery.data.scheduleTime ?? "02:00"),
     );
+    setRetentionDraft(backupStatusQuery.data.retentionPolicy);
     setSelectedStoredFileName((current) => {
       if (
         current.length > 0 &&
@@ -129,9 +136,16 @@ export function BackupSettingsCard({
 
   const backupSettingsMutation = useMutation({
     mutationFn: updateBackupSettings,
-    onSuccess: (status) => {
+    onSuccess: (status, variables) => {
       setBackupError(null);
       applyBackupStatus(status);
+      if (variables.retentionPolicy) {
+        onNotice(
+          `Backup retention saved: ${formatRetentionPolicy(variables.retentionPolicy)}.`,
+        );
+        return;
+      }
+
       onNotice(
         `Automatic backups ${status.enabled ? "enabled" : "disabled"} for ${utcTimeToLocalTime(status.scheduleTime)} (${localTimeZoneLabel}).`,
       );
@@ -155,7 +169,9 @@ export function BackupSettingsCard({
     },
     onError: (error) => {
       setBackupError(
-        error instanceof ApiError ? error.message : "Unable to create a backup.",
+        error instanceof ApiError
+          ? error.message
+          : "Unable to create a backup.",
       );
     },
   });
@@ -192,6 +208,30 @@ export function BackupSettingsCard({
     onError: (error) => {
       setBackupError(
         error instanceof ApiError ? error.message : "Unable to delete backup.",
+      );
+    },
+  });
+
+  const protectionMutation = useMutation({
+    mutationFn: ({
+      fileName,
+      protected: protectedValue,
+    }: {
+      fileName: string;
+      protected: boolean;
+    }) => updateBackupProtection(fileName, { protected: protectedValue }),
+    onSuccess: (status, variables) => {
+      setBackupError(null);
+      applyBackupStatus(status);
+      onNotice(
+        `${variables.protected ? "Protected" : "Unprotected"} ${variables.fileName}.`,
+      );
+    },
+    onError: (error) => {
+      setBackupError(
+        error instanceof ApiError
+          ? error.message
+          : "Unable to update backup protection.",
       );
     },
   });
@@ -344,11 +384,17 @@ export function BackupSettingsCard({
     [selectedUserIds],
   );
   const storedBackups = backupStatus?.backups ?? [];
+  const retentionChanged = backupStatus
+    ? retentionDraft.dailyCount !== backupStatus.retentionPolicy.dailyCount ||
+      retentionDraft.weeklyCount !== backupStatus.retentionPolicy.weeklyCount ||
+      retentionDraft.monthlyCount !== backupStatus.retentionPolicy.monthlyCount
+    : false;
   const busy =
     backupSettingsMutation.isPending ||
     createBackupMutation.isPending ||
     uploadBackupMutation.isPending ||
-    deleteBackupMutation.isPending;
+    deleteBackupMutation.isPending ||
+    protectionMutation.isPending;
 
   const toggleAutomaticBackups = () => {
     if (backupSettingsMutation.isPending || !backupStatus) {
@@ -369,6 +415,18 @@ export function BackupSettingsCard({
     backupSettingsMutation.mutate({
       enabled: backupStatus.enabled,
       scheduleTime: localTimeToUtcTime(scheduleDraft),
+    });
+  };
+
+  const saveRetentionPolicy = () => {
+    if (backupSettingsMutation.isPending || !backupStatus) {
+      return;
+    }
+
+    backupSettingsMutation.mutate({
+      enabled: backupStatus.enabled,
+      retentionPolicy: retentionDraft,
+      scheduleTime: backupStatus.scheduleTime,
     });
   };
 
@@ -493,7 +551,7 @@ export function BackupSettingsCard({
         {`Dates and times use your local timezone (${localTimeZoneLabel}). Backup time is saved in UTC.`}
       </p>
       {backupError ? <p className="error-banner">{backupError}</p> : null}
-      <label className="settings-switch">
+      <label className="settings-switch backup-settings-switch">
         <span className="settings-switch-label">Automatic Backups</span>
         <input
           aria-label="Automatic Backups"
@@ -520,12 +578,12 @@ export function BackupSettingsCard({
             <button
               type="button"
               className="ghost-button compact-button"
-                disabled={
-                  backupSettingsMutation.isPending ||
-                  !backupStatus ||
-                  scheduleDraft === utcTimeToLocalTime(backupStatus.scheduleTime)
-                }
-                onClick={saveSchedule}
+              disabled={
+                backupSettingsMutation.isPending ||
+                !backupStatus ||
+                scheduleDraft === utcTimeToLocalTime(backupStatus.scheduleTime)
+              }
+              onClick={saveSchedule}
             >
               Save
             </button>
@@ -566,6 +624,50 @@ export function BackupSettingsCard({
           </button>
         </div>
       </div>
+      <div className="backup-retention-panel">
+        <div>
+          <strong>Backup retention</strong>
+          <p className="toolbar-hint">
+            Keep the newest backup per UTC day, ISO week, and month. Protected
+            files are always kept until unprotected.
+          </p>
+        </div>
+        <div className="backup-retention-controls">
+          <BackupRetentionNumberField
+            label="Daily"
+            value={retentionDraft.dailyCount}
+            onChange={(dailyCount) =>
+              setRetentionDraft((current) => ({ ...current, dailyCount }))
+            }
+          />
+          <BackupRetentionNumberField
+            label="Weekly"
+            value={retentionDraft.weeklyCount}
+            onChange={(weeklyCount) =>
+              setRetentionDraft((current) => ({ ...current, weeklyCount }))
+            }
+          />
+          <BackupRetentionNumberField
+            label="Monthly"
+            value={retentionDraft.monthlyCount}
+            onChange={(monthlyCount) =>
+              setRetentionDraft((current) => ({ ...current, monthlyCount }))
+            }
+          />
+          <button
+            type="button"
+            className="ghost-button compact-button"
+            disabled={
+              backupSettingsMutation.isPending ||
+              !backupStatus ||
+              !retentionChanged
+            }
+            onClick={saveRetentionPolicy}
+          >
+            Save retention
+          </button>
+        </div>
+      </div>
       <div className="backup-status-grid">
         <div>
           <span className="settings-label">Directory</span>
@@ -589,6 +691,20 @@ export function BackupSettingsCard({
           <span className="settings-label">Stored backups</span>
           <div className="backup-status-value">{storedBackups.length}</div>
         </div>
+        <div>
+          <span className="settings-label">Total storage</span>
+          <div className="backup-status-value">
+            {formatBytes(backupStatus?.totalSizeBytes ?? 0)}
+          </div>
+        </div>
+        <div>
+          <span className="settings-label">Retention policy</span>
+          <div className="backup-status-value">
+            {backupStatus
+              ? formatRetentionPolicy(backupStatus.retentionPolicy)
+              : "Loading..."}
+          </div>
+        </div>
       </div>
       {!backupStatus?.backupDirectoryAccessible ? (
         <p className="error-banner">
@@ -598,65 +714,6 @@ export function BackupSettingsCard({
       {backupStatus?.lastError ? (
         <p className="error-banner">{backupStatus.lastError}</p>
       ) : null}
-
-      <div className="backup-storage-list">
-        <div className="backup-storage-header">
-          <strong>Stored Backups</strong>
-          <span>{storedBackups.length === 0 ? "None yet" : `${storedBackups.length} total`}</span>
-        </div>
-        {storedBackups.length === 0 ? (
-          <p className="toolbar-hint">
-            Use Upload Backup or Backup Now to add a backup to storage.
-          </p>
-        ) : (
-          <div className="backup-storage-rows">
-            {storedBackups.map((backup) => (
-              <div
-                key={backup.fileName}
-                className={`backup-storage-row${selectedStoredFileName === backup.fileName ? " is-selected" : ""}`}
-              >
-                <div className="backup-storage-main">
-                  <strong>{backup.fileName}</strong>
-                  <span>{`${formatTimestamp(backup.modifiedAt)} · ${formatBytes(backup.sizeBytes)}`}</span>
-                </div>
-                <div className="settings-actions">
-                  <button
-                    type="button"
-                    className="ghost-button compact-button"
-                    disabled={previewMutation.isPending || applyMutation.isPending}
-                    onClick={() => startRestorePreview(backup.fileName)}
-                  >
-                    {previewMutation.isPending &&
-                    selectedStoredFileName === backup.fileName
-                      ? "Loading..."
-                      : "Restore"}
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-button compact-button"
-                    disabled={downloadingFileName === backup.fileName}
-                    onClick={() => {
-                      void handleDownload(backup.fileName);
-                    }}
-                  >
-                    {downloadingFileName === backup.fileName
-                      ? "Downloading..."
-                      : "Download"}
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-button compact-button"
-                    disabled={deleteBackupMutation.isPending}
-                    onClick={() => handleDelete(backup.fileName)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {restoreOpen ? (
         <div className="backup-restore-panel">
@@ -684,10 +741,15 @@ export function BackupSettingsCard({
               <button
                 type="button"
                 className="ghost-button compact-button"
-                disabled={previewMutation.isPending || selectedStoredFileName.length === 0}
+                disabled={
+                  previewMutation.isPending ||
+                  selectedStoredFileName.length === 0
+                }
                 onClick={submitPreview}
               >
-                {previewMutation.isPending ? "Previewing..." : "Preview restore"}
+                {previewMutation.isPending
+                  ? "Previewing..."
+                  : "Preview restore"}
               </button>
             </div>
           </div>
@@ -829,7 +891,9 @@ export function BackupSettingsCard({
                         <label className="backup-selection-main backup-selection-main--project">
                           <input
                             className="backup-selection-checkbox"
-                            checked={selectedProjectIds[project.backupId] ?? false}
+                            checked={
+                              selectedProjectIds[project.backupId] ?? false
+                            }
                             onChange={(event) =>
                               setSelectedProjectIds((current) => ({
                                 ...current,
@@ -865,14 +929,14 @@ export function BackupSettingsCard({
                             </span>
                             <select
                               value={
-                                projectConflictActions[project.backupId] ?? "skip"
+                                projectConflictActions[project.backupId] ??
+                                "skip"
                               }
                               onChange={(event) =>
                                 setProjectConflictActions((current) => ({
                                   ...current,
                                   [project.backupId]: event.target.value as
-                                    | "replace"
-                                    | "skip",
+                                    "replace" | "skip",
                                 }))
                               }
                             >
@@ -898,7 +962,10 @@ export function BackupSettingsCard({
                         onClick={() =>
                           setSelectedUserIds(
                             Object.fromEntries(
-                              preview.users.map((user) => [user.backupId, true]),
+                              preview.users.map((user) => [
+                                user.backupId,
+                                true,
+                              ]),
                             ),
                           )
                         }
@@ -951,13 +1018,14 @@ export function BackupSettingsCard({
                                 : "Conflict action"}
                             </span>
                             <select
-                              value={userConflictActions[user.backupId] ?? "skip"}
+                              value={
+                                userConflictActions[user.backupId] ?? "skip"
+                              }
                               onChange={(event) =>
                                 setUserConflictActions((current) => ({
                                   ...current,
                                   [user.backupId]: event.target.value as
-                                    | "replace"
-                                    | "skip",
+                                    "replace" | "skip",
                                 }))
                               }
                             >
@@ -986,6 +1054,89 @@ export function BackupSettingsCard({
           ) : null}
         </div>
       ) : null}
+      <div className="backup-storage-list">
+        <div className="backup-storage-header">
+          <strong>Stored Backups</strong>
+          <span>
+            {storedBackups.length === 0
+              ? "None yet"
+              : `${storedBackups.length} total`}
+          </span>
+        </div>
+        {storedBackups.length === 0 ? (
+          <p className="toolbar-hint">
+            Use Upload Backup or Backup Now to add a backup to storage.
+          </p>
+        ) : (
+          <div className="backup-storage-rows">
+            {storedBackups.map((backup) => (
+              <div
+                key={backup.fileName}
+                className={`backup-storage-row${selectedStoredFileName === backup.fileName ? " is-selected" : ""}`}
+              >
+                <div className="backup-storage-main">
+                  <strong>{backup.fileName}</strong>
+                  <span>{`${formatTimestamp(backup.modifiedAt)} · ${formatBytes(backup.sizeBytes)}`}</span>
+                  {backup.protected ? (
+                    <span>
+                      {`Protected${backup.protectedByName ? ` by ${backup.protectedByName}` : ""}${backup.protectedAt ? ` on ${formatTimestamp(backup.protectedAt)}` : ""}`}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="settings-actions">
+                  <button
+                    type="button"
+                    className="ghost-button compact-button"
+                    disabled={protectionMutation.isPending}
+                    onClick={() =>
+                      protectionMutation.mutate({
+                        fileName: backup.fileName,
+                        protected: !backup.protected,
+                      })
+                    }
+                  >
+                    {backup.protected ? "Unprotect" : "Protect"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button compact-button"
+                    disabled={
+                      previewMutation.isPending || applyMutation.isPending
+                    }
+                    onClick={() => startRestorePreview(backup.fileName)}
+                  >
+                    {previewMutation.isPending &&
+                    selectedStoredFileName === backup.fileName
+                      ? "Loading..."
+                      : "Restore"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button compact-button"
+                    disabled={downloadingFileName === backup.fileName}
+                    onClick={() => {
+                      void handleDownload(backup.fileName);
+                    }}
+                  >
+                    {downloadingFileName === backup.fileName
+                      ? "Downloading..."
+                      : "Download"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button compact-button"
+                    disabled={deleteBackupMutation.isPending}
+                    onClick={() => handleDelete(backup.fileName)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {restoreConfirmationOpen && preview ? (
         <BackupRestoreConfirmModal
           isApplying={applyMutation.isPending}
@@ -1171,8 +1322,8 @@ function BackupDeleteModal({
       }
     >
       <p className="toolbar-hint">
-        This does not change workspace data, but the selected backup file will no
-        longer be available for restore.
+        This does not change workspace data, but the selected backup file will
+        no longer be available for restore.
       </p>
     </Modal>
   );
@@ -1187,4 +1338,39 @@ function buildStoredSource(selectedStoredFileName: string) {
     fileName: selectedStoredFileName,
     kind: "stored" as const,
   };
+}
+
+type BackupRetentionNumberFieldProps = {
+  label: string;
+  onChange: (value: number) => void;
+  value: number;
+};
+
+function BackupRetentionNumberField({
+  label,
+  onChange,
+  value,
+}: BackupRetentionNumberFieldProps) {
+  return (
+    <label className="settings-time-field backup-retention-field">
+      <span className="settings-label">{label}</span>
+      <input
+        aria-label={`${label} backup retention`}
+        min={0}
+        onChange={(event) =>
+          onChange(Math.max(0, Number.parseInt(event.target.value, 10) || 0))
+        }
+        type="number"
+        value={value}
+      />
+    </label>
+  );
+}
+
+function formatRetentionPolicy(policy: {
+  dailyCount: number;
+  monthlyCount: number;
+  weeklyCount: number;
+}) {
+  return `${policy.dailyCount.toString()} daily / ${policy.weeklyCount.toString()} weekly / ${policy.monthlyCount.toString()} monthly`;
 }

@@ -18,12 +18,15 @@ import {
 import type {
   ApplyBackupRestoreInput,
   ApplyBackupRestoreResult,
+  BackupFileSummary,
+  BackupRetentionPolicy,
   BackupRestoreProjectPreview,
   BackupRestoreUserPreview,
   BackupRestorePreview,
   BackupStatus,
   PreviewBackupRestoreInput,
   UpdateBackupSettingsInput,
+  UpdateBackupProtectionInput,
   UploadBackupFileInput,
 } from '@tavi/schemas';
 import {
@@ -54,6 +57,11 @@ const RETENTION_SETTINGS_ID = 'global';
 const DEFAULT_BACKUP_SCHEDULE_TIME = '02:00';
 const DEFAULT_DAILY_DIGEST_TIME = '11:00';
 const DEFAULT_BACKUP_RETENTION = 'six_months';
+const DEFAULT_BACKUP_RETENTION_POLICY = {
+  dailyCount: 7,
+  monthlyCount: 3,
+  weeklyCount: 4,
+} as const satisfies BackupRetentionPolicy;
 const DEFAULT_LOGIN_RETENTION = 'twelve_months';
 const DEFAULT_CHANGE_RETENTION = 'twelve_months';
 const DEFAULT_NOTIFICATION_RETENTION = 'one_month';
@@ -267,7 +275,25 @@ const backupSettingsRecordSchema = z.object({
 });
 
 const backupRetentionSettingsRecordSchema = z.object({
+  backupDailyCount: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .default(DEFAULT_BACKUP_RETENTION_POLICY.dailyCount),
+  backupMonthlyCount: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .default(DEFAULT_BACKUP_RETENTION_POLICY.monthlyCount),
   backupRetention: backupRetentionWindowSchema,
+  backupWeeklyCount: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .default(DEFAULT_BACKUP_RETENTION_POLICY.weeklyCount),
   changeRetention: logRetentionWindowSchema,
   createdAt: z.string().min(1),
   id: z.string().min(1),
@@ -357,13 +383,24 @@ type CurrentUserLookup = {
   name: string;
 };
 type StoredRetentionSettingsRow = {
+  backupDailyCount: number | null;
+  backupMonthlyCount: number | null;
   backupRetention: string;
+  backupWeeklyCount: number | null;
   changeRetention: string;
   createdAt: Date;
   id: string;
   loginRetention: string;
   notificationRetention: string;
   updatedAt: Date;
+};
+
+type BackupProtectionRow = {
+  fileName: string;
+  protectedAt: Date;
+  protectedBy: {
+    name: string;
+  } | null;
 };
 
 function getDefaultBackupDirectory() {
@@ -467,7 +504,10 @@ function readBackupRetentionSettings(snapshot: BackupSnapshot) {
     : null;
 
   return {
+    backupDailyCount: DEFAULT_BACKUP_RETENTION_POLICY.dailyCount,
+    backupMonthlyCount: DEFAULT_BACKUP_RETENTION_POLICY.monthlyCount,
     backupRetention: DEFAULT_BACKUP_RETENTION,
+    backupWeeklyCount: DEFAULT_BACKUP_RETENTION_POLICY.weeklyCount,
     changeRetention: legacyLogRetention ?? DEFAULT_CHANGE_RETENTION,
     createdAt: snapshot.createdAt,
     id: 'global',
@@ -475,6 +515,128 @@ function readBackupRetentionSettings(snapshot: BackupSnapshot) {
     notificationRetention: DEFAULT_NOTIFICATION_RETENTION,
     updatedAt: snapshot.createdAt,
   } satisfies BackupRetentionSettingsRecord;
+}
+
+function normalizeRetentionCount(
+  value: number | null | undefined,
+  defaultValue: number,
+) {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+    ? value
+    : defaultValue;
+}
+
+function toBackupRetentionPolicy(
+  row: Pick<
+    StoredRetentionSettingsRow,
+    'backupDailyCount' | 'backupMonthlyCount' | 'backupWeeklyCount'
+  > | null,
+): BackupRetentionPolicy {
+  return {
+    dailyCount: normalizeRetentionCount(
+      row?.backupDailyCount,
+      DEFAULT_BACKUP_RETENTION_POLICY.dailyCount,
+    ),
+    monthlyCount: normalizeRetentionCount(
+      row?.backupMonthlyCount,
+      DEFAULT_BACKUP_RETENTION_POLICY.monthlyCount,
+    ),
+    weeklyCount: normalizeRetentionCount(
+      row?.backupWeeklyCount,
+      DEFAULT_BACKUP_RETENTION_POLICY.weeklyCount,
+    ),
+  };
+}
+
+function getUtcDayKey(value: string) {
+  return value.slice(0, 10);
+}
+
+function getUtcMonthKey(value: string) {
+  return value.slice(0, 7);
+}
+
+function getUtcWeekKey(value: string) {
+  const date = new Date(value);
+  const day = date.getUTCDay() || 7;
+  const thursday = new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate() + 4 - day,
+    ),
+  );
+  const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(
+    ((thursday.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,
+  );
+
+  return `${thursday.getUTCFullYear()}-W${week.toString().padStart(2, '0')}`;
+}
+
+function addTierRetainedBackups(
+  retainedFileNames: Set<string>,
+  assignedBucketKeys: Set<string>,
+  backups: BackupFileSummary[],
+  count: number,
+  buildBucketKey: (modifiedAt: string) => string,
+) {
+  if (count === 0) {
+    return;
+  }
+
+  for (const backup of backups) {
+    if (retainedFileNames.has(backup.fileName) || backup.protected) {
+      continue;
+    }
+
+    const bucketKey = buildBucketKey(backup.modifiedAt);
+    if (assignedBucketKeys.has(bucketKey)) {
+      continue;
+    }
+
+    retainedFileNames.add(backup.fileName);
+    assignedBucketKeys.add(bucketKey);
+
+    if (assignedBucketKeys.size >= count) {
+      return;
+    }
+  }
+}
+
+function selectRetainedBackupFileNames(
+  backups: BackupFileSummary[],
+  policy: BackupRetentionPolicy,
+) {
+  const retainedFileNames = new Set(
+    backups
+      .filter((backup) => backup.protected)
+      .map((backup) => backup.fileName),
+  );
+
+  addTierRetainedBackups(
+    retainedFileNames,
+    new Set<string>(),
+    backups,
+    policy.dailyCount,
+    getUtcDayKey,
+  );
+  addTierRetainedBackups(
+    retainedFileNames,
+    new Set<string>(),
+    backups,
+    policy.weeklyCount,
+    getUtcWeekKey,
+  );
+  addTierRetainedBackups(
+    retainedFileNames,
+    new Set<string>(),
+    backups,
+    policy.monthlyCount,
+    getUtcMonthKey,
+  );
+
+  return retainedFileNames;
 }
 
 function isBackupRetentionWindow(value: string) {
@@ -517,6 +679,9 @@ function toBackupRetentionSettingsRecord(
 
   return {
     backupRetention: row.backupRetention,
+    backupDailyCount: toBackupRetentionPolicy(row).dailyCount,
+    backupMonthlyCount: toBackupRetentionPolicy(row).monthlyCount,
+    backupWeeklyCount: toBackupRetentionPolicy(row).weeklyCount,
     changeRetention: row.changeRetention,
     createdAt: row.createdAt.toISOString(),
     id: row.id,
@@ -555,9 +720,10 @@ export class BackupsService {
   ) {}
 
   async getBackupStatus(): Promise<BackupStatus> {
-    const [settings, directoryState] = await Promise.all([
+    const [settings, directoryState, retentionPolicy] = await Promise.all([
       this.readBackupSettings(),
       this.readBackupDirectoryState(),
+      this.readBackupRetentionPolicy(),
     ]);
 
     return {
@@ -569,7 +735,12 @@ export class BackupsService {
       lastFailureAt: settings?.lastFailureAt?.toISOString() ?? null,
       lastScheduledRunAt: settings?.lastScheduledRunAt?.toISOString() ?? null,
       lastSuccessAt: settings?.lastSuccessAt?.toISOString() ?? null,
+      retentionPolicy,
       scheduleTime: settings?.scheduleTime ?? DEFAULT_BACKUP_SCHEDULE_TIME,
+      totalSizeBytes: directoryState.backups.reduce(
+        (total, backup) => total + backup.sizeBytes,
+        0,
+      ),
     };
   }
 
@@ -578,14 +749,7 @@ export class BackupsService {
     return directoryState.backups;
   }
 
-  async pruneStoredBackups(cutoff: Date | null) {
-    if (cutoff === null) {
-      return {
-        deletedCount: 0,
-        deletedSizeBytes: 0,
-      };
-    }
-
+  async pruneStoredBackups(policy: BackupRetentionPolicy) {
     const directoryState = await this.readBackupDirectoryState();
 
     if (!directoryState.accessible) {
@@ -597,9 +761,13 @@ export class BackupsService {
 
     let deletedCount = 0;
     let deletedSizeBytes = 0;
+    const retainedFileNames = selectRetainedBackupFileNames(
+      directoryState.backups,
+      policy,
+    );
 
     for (const backup of directoryState.backups) {
-      if (new Date(backup.modifiedAt) >= cutoff) {
+      if (backup.protected || retainedFileNames.has(backup.fileName)) {
         continue;
       }
 
@@ -616,6 +784,10 @@ export class BackupsService {
       deletedSizeBytes += backup.sizeBytes;
     }
 
+    if (deletedCount > 0) {
+      await this.deleteProtectionMetadataForMissingFiles();
+    }
+
     return {
       deletedCount,
       deletedSizeBytes,
@@ -626,18 +798,23 @@ export class BackupsService {
     actor: SessionUser,
     input: UpdateBackupSettingsInput,
   ): Promise<BackupStatus> {
-    await this.prisma.backupSettings.upsert({
-      where: { id: BACKUP_SETTINGS_ID },
-      update: {
-        enabled: input.enabled,
-        scheduleTime: input.scheduleTime,
-      },
-      create: {
-        enabled: input.enabled,
-        id: BACKUP_SETTINGS_ID,
-        scheduleTime: input.scheduleTime,
-      },
-    });
+    await Promise.all([
+      this.prisma.backupSettings.upsert({
+        where: { id: BACKUP_SETTINGS_ID },
+        update: {
+          enabled: input.enabled,
+          scheduleTime: input.scheduleTime,
+        },
+        create: {
+          enabled: input.enabled,
+          id: BACKUP_SETTINGS_ID,
+          scheduleTime: input.scheduleTime,
+        },
+      }),
+      input.retentionPolicy
+        ? this.writeBackupRetentionPolicy(input.retentionPolicy)
+        : Promise.resolve(),
+    ]);
 
     await this.authService.recordAudit(
       actor,
@@ -646,6 +823,9 @@ export class BackupsService {
       'backup_settings_updated',
       {
         enabled: input.enabled,
+        ...(input.retentionPolicy
+          ? { retentionPolicy: input.retentionPolicy }
+          : {}),
         scheduleTime: input.scheduleTime,
       },
     );
@@ -704,6 +884,8 @@ export class BackupsService {
       },
     );
 
+    await this.pruneStoredBackups(await this.readBackupRetentionPolicy());
+
     return this.getBackupStatus();
   }
 
@@ -725,6 +907,8 @@ export class BackupsService {
         fileName,
       },
     );
+
+    await this.pruneStoredBackups(await this.readBackupRetentionPolicy());
 
     return this.getBackupStatus();
   }
@@ -763,12 +947,61 @@ export class BackupsService {
 
         throw error;
       });
+    await this.prisma.backupFileProtection.deleteMany({
+      where: { fileName: sanitizedFileName },
+    });
 
     await this.authService.recordAudit(
       actor,
       'auth',
       actor.id,
       'backup_deleted',
+      {
+        fileName: sanitizedFileName,
+      },
+    );
+
+    return this.getBackupStatus();
+  }
+
+  async updateBackupProtection(
+    actor: SessionUser,
+    fileName: string,
+    input: UpdateBackupProtectionInput,
+  ): Promise<BackupStatus> {
+    const sanitizedFileName = sanitizeBackupFileName(fileName);
+    const directory = await resolveBackupDirectory();
+    await fs.stat(path.join(directory, sanitizedFileName)).catch((error) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new NotFoundException('Backup file not found');
+      }
+
+      throw error;
+    });
+
+    if (input.protected) {
+      await this.prisma.backupFileProtection.upsert({
+        where: { fileName: sanitizedFileName },
+        update: {
+          protectedAt: new Date(),
+          protectedByUserId: actor.id,
+        },
+        create: {
+          fileName: sanitizedFileName,
+          protectedByUserId: actor.id,
+        },
+      });
+    } else {
+      await this.prisma.backupFileProtection.deleteMany({
+        where: { fileName: sanitizedFileName },
+      });
+    }
+
+    await this.authService.recordAudit(
+      actor,
+      'auth',
+      actor.id,
+      input.protected ? 'backup_protected' : 'backup_unprotected',
       {
         fileName: sanitizedFileName,
       },
@@ -1254,6 +1487,9 @@ export class BackupsService {
           INSERT INTO "RetentionSettings" (
             "id",
             "backupRetention",
+            "backupDailyCount",
+            "backupWeeklyCount",
+            "backupMonthlyCount",
             "loginRetention",
             "changeRetention",
             "notificationRetention",
@@ -1263,6 +1499,9 @@ export class BackupsService {
           VALUES (
             ${retentionSettings.id},
             ${retentionSettings.backupRetention},
+            ${retentionSettings.backupDailyCount},
+            ${retentionSettings.backupWeeklyCount},
+            ${retentionSettings.backupMonthlyCount},
             ${retentionSettings.loginRetention},
             ${retentionSettings.changeRetention},
             ${retentionSettings.notificationRetention},
@@ -1740,7 +1979,10 @@ export class BackupsService {
       Prisma.sql`
         SELECT
           "id",
+          "backupDailyCount",
+          "backupMonthlyCount",
           "backupRetention",
+          "backupWeeklyCount",
           "loginRetention",
           "changeRetention",
           "notificationRetention",
@@ -1753,6 +1995,51 @@ export class BackupsService {
     );
 
     return toBackupRetentionSettingsRecord(rows[0] ?? null);
+  }
+
+  private async readBackupRetentionPolicy() {
+    const rows = await this.prisma.$queryRaw<StoredRetentionSettingsRow[]>(
+      Prisma.sql`
+        SELECT
+          "backupDailyCount",
+          "backupMonthlyCount",
+          "backupRetention",
+          "backupWeeklyCount",
+          "changeRetention",
+          "createdAt",
+          "id",
+          "loginRetention",
+          "notificationRetention",
+          "updatedAt"
+        FROM "RetentionSettings"
+        WHERE "id" = ${RETENTION_SETTINGS_ID}
+        LIMIT 1
+      `,
+    );
+
+    return toBackupRetentionPolicy(rows[0] ?? null);
+  }
+
+  private async writeBackupRetentionPolicy(policy: BackupRetentionPolicy) {
+    await this.prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "RetentionSettings" (
+        "id",
+        "backupDailyCount",
+        "backupWeeklyCount",
+        "backupMonthlyCount"
+      )
+      VALUES (
+        ${RETENTION_SETTINGS_ID},
+        ${policy.dailyCount},
+        ${policy.weeklyCount},
+        ${policy.monthlyCount}
+      )
+      ON CONFLICT ("id") DO UPDATE
+      SET
+        "backupDailyCount" = EXCLUDED."backupDailyCount",
+        "backupWeeklyCount" = EXCLUDED."backupWeeklyCount",
+        "backupMonthlyCount" = EXCLUDED."backupMonthlyCount"
+    `);
   }
 
   private async readBackupDirectoryState() {
@@ -1773,18 +2060,58 @@ export class BackupsService {
                 createdAt: stats.birthtime.toISOString(),
                 fileName: entry.name,
                 modifiedAt: stats.mtime.toISOString(),
+                protected: false,
+                protectedAt: null,
+                protectedByName: null,
                 sizeBytes: stats.size,
               };
             }),
         );
+        const protectionRows = await this.prisma.backupFileProtection.findMany({
+          where: {
+            fileName: {
+              in: backupFiles.map((backup) => backup.fileName),
+            },
+          },
+          select: {
+            fileName: true,
+            protectedAt: true,
+            protectedBy: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        });
+        const protectionsByFileName = new Map(
+          (protectionRows as BackupProtectionRow[]).map((protection) => [
+            protection.fileName,
+            protection,
+          ]),
+        );
+        const protectedBackupFiles = backupFiles.map((backup) => {
+          const protection = protectionsByFileName.get(backup.fileName);
 
-        backupFiles.sort((left, right) =>
-          right.modifiedAt.localeCompare(left.modifiedAt),
+          return {
+            ...backup,
+            protected: Boolean(protection),
+            protectedAt: protection?.protectedAt.toISOString() ?? null,
+            protectedByName: protection?.protectedBy?.name ?? null,
+          };
+        });
+
+        protectedBackupFiles.sort(
+          (left, right) =>
+            right.modifiedAt.localeCompare(left.modifiedAt) ||
+            right.fileName.localeCompare(left.fileName),
+        );
+        await this.deleteProtectionMetadataForExistingFiles(
+          protectedBackupFiles.map((backup) => backup.fileName),
         );
 
         return {
           accessible: true,
-          backups: backupFiles,
+          backups: protectedBackupFiles,
           directory,
         };
       } catch {
@@ -1797,6 +2124,30 @@ export class BackupsService {
       backups: [],
       directory: candidates[0] ?? getDefaultBackupDirectory(),
     };
+  }
+
+  private async deleteProtectionMetadataForExistingFiles(fileNames: string[]) {
+    if (fileNames.length === 0) {
+      await this.prisma.backupFileProtection.deleteMany({});
+      return;
+    }
+
+    await this.prisma.backupFileProtection.deleteMany({
+      where: {
+        fileName: {
+          notIn: fileNames,
+        },
+      },
+    });
+  }
+
+  private async deleteProtectionMetadataForMissingFiles() {
+    const directoryState = await this.readBackupDirectoryState();
+    if (directoryState.accessible) {
+      await this.deleteProtectionMetadataForExistingFiles(
+        directoryState.backups.map((backup) => backup.fileName),
+      );
+    }
   }
 
   private parseSnapshotContent(content: string) {
