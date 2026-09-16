@@ -694,7 +694,18 @@ export class EmailService implements OnModuleInit {
       },
     });
 
-    return settings as EmailSettingsRecord | null;
+    if (!settings) {
+      return null;
+    }
+
+    return {
+      dragHandlesEnabled: settings.dragHandlesEnabled,
+      enabled: settings.enabled,
+      guestAccessEnabled: settings.guestAccessEnabled,
+      smtpUrl: settings.smtpUrl,
+      fromAddress: settings.fromAddress,
+      homeUrl: settings.homeUrl,
+    };
   }
 
   private getEffectiveConfig(settings: EmailSettingsRecord | null) {
