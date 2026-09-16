@@ -1,3 +1,10 @@
 import { jest } from '@jest/globals';
 
-(globalThis as typeof globalThis & { jest: typeof jest }).jest = jest;
+const typedJest = jest as typeof import('jest');
+
+Object.defineProperty(globalThis, 'jest', {
+  value: typedJest,
+  configurable: true,
+  enumerable: true,
+  writable: true,
+});
