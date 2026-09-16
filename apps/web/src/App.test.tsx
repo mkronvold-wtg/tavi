@@ -45,6 +45,11 @@ const createSmtpStatusPayload = (
     dragHandlesEnabled: boolean;
     enabled: boolean;
     fromAddress: string;
+    homeUrl: string;
+    smtpUrl: string;
+    smtpUrlSource: "database" | "environment";
+    fromAddressSource: "database" | "environment";
+    homeUrlSource: "database" | "environment";
     guestAccessEnabled: boolean;
     host: string | null;
     port: number | null;
@@ -55,6 +60,11 @@ const createSmtpStatusPayload = (
   dragHandlesEnabled: true,
   enabled: true,
   fromAddress: "noreply@tavi.local",
+  homeUrl: "http://localhost:5173",
+  smtpUrl: "smtp://10.120.64.99:25",
+  smtpUrlSource: "environment",
+  fromAddressSource: "environment",
+  homeUrlSource: "environment",
   guestAccessEnabled: true,
   host: "10.120.64.99",
   port: 25,
@@ -3606,6 +3616,9 @@ describe("App", () => {
           dragHandlesEnabled: true,
           enabled: false,
           guestAccessEnabled: true,
+          smtpUrl: "smtp://10.120.64.99:25",
+          fromAddress: "noreply@tavi.local",
+          homeUrl: "http://localhost:5173",
         }),
       );
       expect(emailNotificationsSwitch).not.toBeChecked();
@@ -3683,6 +3696,9 @@ describe("App", () => {
           dragHandlesEnabled: false,
           enabled: true,
           guestAccessEnabled: true,
+          smtpUrl: "smtp://10.120.64.99:25",
+          fromAddress: "noreply@tavi.local",
+          homeUrl: "http://localhost:5173",
         }),
       );
       expect(dragHandlesSwitch).not.toBeChecked();
@@ -3755,6 +3771,9 @@ describe("App", () => {
           dragHandlesEnabled: true,
           enabled: true,
           guestAccessEnabled: false,
+          smtpUrl: "smtp://10.120.64.99:25",
+          fromAddress: "noreply@tavi.local",
+          homeUrl: "http://localhost:5173",
         }),
       );
       expect(guestAccessSwitch).not.toBeChecked();
