@@ -376,6 +376,9 @@ model EmailSettings {
   enabled            Boolean  @default(true)
   dragHandlesEnabled Boolean  @default(true)
   guestAccessEnabled Boolean  @default(true)
+  smtpUrl            String?
+  fromAddress        String?
+  homeUrl            String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }

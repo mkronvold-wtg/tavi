@@ -61,12 +61,13 @@ export class NotificationWorker {
   private readonly idleDelayMs: number;
   private readonly scheduleIntervalMs: number;
   private readonly workDelayMs: number;
-  private readonly fromAddress: string;
-  private readonly homeUrl: string;
-  private readonly transporter: Transporter | null;
-  private readonly configured: boolean;
-  private readonly smtpHostLabel: string | null;
+  private fromAddress: string;
+  private homeUrl: string;
+  private transporter: Transporter | null;
+  private configured: boolean;
+  private smtpHostLabel: string | null;
   private lastScheduleCheckAt = 0;
+  private smtpUrl = "";
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -538,8 +539,15 @@ export class NotificationWorker {
 
     const settings = await this.prisma.emailSettings.findUnique({
       where: { id: "global" },
-      select: { enabled: true },
+      select: {
+        enabled: true,
+        smtpUrl: true,
+        fromAddress: true,
+        homeUrl: true,
+      },
     });
+
+    this.configureFromSettings(settings);
 
     if (settings?.enabled === false) {
       return "email_disabled";
@@ -561,6 +569,41 @@ export class NotificationWorker {
     }
 
     return null;
+  }
+
+  private configureFromSettings(settings: {
+    smtpUrl?: string | null;
+    fromAddress?: string | null;
+    homeUrl?: string | null;
+  } | null) {
+    const smtpUrl = settings?.smtpUrl ?? process.env.SMTP_URL ?? DEFAULT_SMTP_URL;
+    const fromAddress = settings?.fromAddress ?? process.env.SMTP_FROM ?? DEFAULT_SMTP_FROM;
+    if (smtpUrl === this.smtpUrl && fromAddress === this.fromAddress) {
+      if (settings?.homeUrl) this.homeUrl = settings.homeUrl;
+      return;
+    }
+    this.smtpUrl = smtpUrl;
+    this.fromAddress = fromAddress;
+    this.homeUrl = settings?.homeUrl ?? process.env.TAVI_HOME_URL ?? "http://localhost:5173";
+    try {
+      const { auth, host, port, secure } = parseSmtpUrl(smtpUrl);
+      this.smtpHostLabel = `${host}:${port.toString()}`;
+      this.transporter = createTransport({
+        host,
+        port,
+        secure,
+        ...(auth ? { auth } : {}),
+        ...(secure ? {} : { tls: { rejectUnauthorized: false } }),
+      });
+      this.configured = true;
+    } catch (error) {
+      this.transporter = null;
+      this.configured = false;
+      this.smtpHostLabel = null;
+      this.observability.logger.warn("worker.notifications.transport_unavailable", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   private async consumeBufferedSourceNotifications(

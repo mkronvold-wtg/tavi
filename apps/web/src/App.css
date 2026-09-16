@@ -922,6 +922,18 @@
   font-size: 0.9rem;
 }
 
+.settings-field {
+  display: grid;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.settings-field input {
+  min-width: 0;
+  padding: 6px 8px;
+}
+
 .theme-cycle-controls {
   display: flex;
   flex-wrap: wrap;
