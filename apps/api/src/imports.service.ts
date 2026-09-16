@@ -354,18 +354,18 @@ export class ImportsService {
     const updates: Prisma.PrismaPromise<unknown>[] = [];
 
     if (input.projectAction !== undefined) {
-      if (!targetRow.projectOverlap) {
-        throw new BadRequestException(
-          'Project overlap action can only be changed for overlapping rows',
-        );
-      }
-
       const projectGroupKey = buildPreparedLoopImportProjectKey(targetRow);
       const projectRowNumbers = preview.rows
         .filter(
           (row) => buildPreparedLoopImportProjectKey(row) === projectGroupKey,
         )
         .map((row) => row.rowNumber);
+
+      if (!targetRow.projectOverlap && projectRowNumbers.length <= 1) {
+        throw new BadRequestException(
+          'Project overlap action can only be changed for overlapping rows',
+        );
+      }
 
       updates.push(
         this.prisma.importRow.updateMany({
@@ -383,7 +383,22 @@ export class ImportsService {
     }
 
     if (input.taskAction !== undefined) {
-      if (!targetRow.taskOverlap) {
+      const projectGroupKey = buildPreparedLoopImportProjectKey(targetRow);
+      const taskGroupKey = buildPreparedLoopImportTaskKey(
+        projectGroupKey,
+        targetRow,
+      );
+      const taskRowNumbers = preview.rows
+        .filter(
+          (row) =>
+            buildPreparedLoopImportTaskKey(
+              buildPreparedLoopImportProjectKey(row),
+              row,
+            ) === taskGroupKey,
+        )
+        .map((row) => row.rowNumber);
+
+      if (!targetRow.taskOverlap && taskRowNumbers.length <= 1) {
         throw new BadRequestException(
           'Task overlap action can only be changed for overlapping rows',
         );
@@ -393,7 +408,9 @@ export class ImportsService {
         this.prisma.importRow.updateMany({
           where: {
             importId,
-            rowNumber,
+            rowNumber: {
+              in: taskRowNumbers,
+            },
           },
           data: {
             taskOverlapAction: input.taskAction,
