@@ -1121,6 +1121,7 @@ function WorkspaceScreen({
   const [pendingSearchTaskReveal, setPendingSearchTaskReveal] =
     useState<SearchTaskRevealTarget | null>(null);
   const [localAccountsOpen, setLocalAccountsOpen] = useState(false);
+  const [emailConfigOpen, setEmailConfigOpen] = useState(false);
   const [adminAuditPanel, setAdminAuditPanel] =
     useState<AdminAuditReportType | null>(null);
   const [retentionOpen, setRetentionOpen] = useState(false);
@@ -3325,6 +3326,7 @@ function WorkspaceScreen({
               adminAuditPanel={adminAuditPanel}
               isBackupsOpen={panelState.backups}
               isAdmin={data.currentUser.role === "admin"}
+              isEmailConfigOpen={emailConfigOpen}
               isImportExportOpen={panelState.importExport}
               isLocalAccountsOpen={localAccountsOpen}
               onToggleAdminAuditPanel={(panel) => {
@@ -3335,6 +3337,10 @@ function WorkspaceScreen({
               }}
               onToggleBackupsPanel={() => {
                 toggleWorkspacePanel("backups");
+                setWorkspacePanelOpen("settings", false);
+              }}
+              onToggleEmailConfigPanel={() => {
+                setEmailConfigOpen((current) => !current);
                 setWorkspacePanelOpen("settings", false);
               }}
               onToggleImportExportPanel={() => {
@@ -3350,6 +3356,12 @@ function WorkspaceScreen({
                 setWorkspacePanelOpen("settings", false);
               }}
               retentionOpen={retentionOpen}
+            />
+          ) : null}
+
+          {emailConfigOpen ? (
+            <EmailSettingsPanel
+              onClose={() => setEmailConfigOpen(false)}
               smtpStatus={smtpStatusQuery.data}
             />
           ) : null}
@@ -5920,43 +5932,20 @@ function formatPersonalTodoRetentionLabel(
   }
 }
 
-type SettingsPanelProps = {
-  adminAuditPanel: AdminAuditReportType | null;
-  isBackupsOpen: boolean;
-  isAdmin: boolean;
-  isImportExportOpen: boolean;
-  isLocalAccountsOpen: boolean;
-  onToggleAdminAuditPanel: (panel: AdminAuditReportType) => void;
-  onToggleBackupsPanel: () => void;
-  onToggleImportExportPanel: () => void;
-  onToggleLocalAccounts: () => void;
-  onToggleRetentionPanel: () => void;
-  retentionOpen: boolean;
+type EmailSettingsPanelProps = {
+  onClose: () => void;
   smtpStatus: SmtpStatus | undefined;
 };
 
-function SettingsPanel({
-  adminAuditPanel,
-  isBackupsOpen,
-  isAdmin,
-  isImportExportOpen,
-  isLocalAccountsOpen,
-  onToggleAdminAuditPanel,
-  onToggleBackupsPanel,
-  onToggleImportExportPanel,
-  onToggleLocalAccounts,
-  onToggleRetentionPanel,
-  retentionOpen,
-  smtpStatus,
-}: SettingsPanelProps) {
+function EmailSettingsPanel({ onClose, smtpStatus }: EmailSettingsPanelProps) {
   const [emailPrefError, setEmailPrefError] = useState<string | null>(null);
   const [emailConfig, setEmailConfig] = useState({
     smtpUrl: smtpStatus?.smtpUrl ?? "",
     fromAddress: smtpStatus?.fromAddress ?? "",
     homeUrl: smtpStatus?.homeUrl ?? "",
   });
-
   const queryClient = useQueryClient();
+
   useEffect(() => {
     if (smtpStatus) {
       setEmailConfig({
@@ -5966,6 +5955,7 @@ function SettingsPanel({
       });
     }
   }, [smtpStatus]);
+
   const smtpServer =
     smtpStatus?.host && smtpStatus.port != null
       ? `${smtpStatus.secure ? "smtps" : "smtp"}://${smtpStatus.host}:${smtpStatus.port}`
@@ -6029,6 +6019,7 @@ function SettingsPanel({
       );
     },
   });
+
   const toggleEmailNotifications = () => {
     if (emailSettingsMutation.isPending || !smtpStatus) {
       return;
@@ -6066,70 +6057,102 @@ function SettingsPanel({
     });
   };
 
-  if (!isAdmin) {
-    return null;
-  }
-
   return (
     <section className="workspace-panel-card">
       <header className="panel-header">
         <div>
-          <strong>Settings</strong>
-          <span>Workspace-wide admin controls, tools, and system reports.</span>
-        </div>
-        <div className="settings-version">
-          <div className="settings-version-row">
-            <a
-              className="settings-link settings-version-link"
-              href={appChangelogUrl}
-              rel="noreferrer"
-              target="_blank"
-              title="View changelog on GitHub"
-            >
-              {`${appName} ${buildShaLabel}`}
-            </a>
-          </div>
-          <BuildDateLabel />
-          {isAdmin && smtpServer ? (
+          <strong>Email config</strong>
+          <span>Configure SMTP delivery and workspace email settings.</span>
+          {smtpServer ? (
             <span className="settings-version-detail">{smtpServer}</span>
           ) : null}
-          {isAdmin && smtpStatus?.fromAddress ? (
+          {smtpStatus?.fromAddress ? (
             <span className="settings-version-detail">
               {smtpStatus.fromAddress}
             </span>
           ) : null}
         </div>
+        <div className="settings-actions">
+          <button
+            className="ghost-button compact-button"
+            onClick={onClose}
+            type="button"
+          >
+            Close
+          </button>
+        </div>
       </header>
 
+      {emailPrefError ? <p className="error-banner">{emailPrefError}</p> : null}
+
       <div className="settings-grid">
-        <div
-          className="settings-item settings-item-toggle"
-          onClick={toggleEmailNotifications}
-        >
+        <div className="settings-item">
           <div className="settings-item-header">
-            <strong>Email config</strong>
+            <strong>Email Notifications</strong>
             <span>{emailEnabled ? "On" : "Off"}</span>
           </div>
           <p className="toolbar-hint">
-            Configure SMTP delivery and workspace email notifications.
+            Enable or disable workspace email notifications.
           </p>
-          {emailPrefError ? (
-            <p className="error-banner">{emailPrefError}</p>
-          ) : null}
-          <label
-            className="settings-switch"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <label className="settings-switch">
             <span className="settings-switch-label">Email Notifications</span>
             <input
               aria-label="Email Notifications"
               checked={emailEnabled}
               className="settings-switch-input"
+              disabled={emailSettingsMutation.isPending || !smtpStatus}
               onChange={toggleEmailNotifications}
               role="switch"
               type="checkbox"
             />
           </label>
+        </div>
+
+        <div className="settings-item">
+          <div className="settings-item-header">
+            <strong>Task Drag Handles</strong>
+            <span>{dragHandlesEnabled ? "On" : "Off"}</span>
+          </div>
+          <p className="toolbar-hint">
+            Show or hide manual task-reorder handles for the whole workspace.
+          </p>
+          <label className="settings-switch">
+            <span className="settings-switch-label">Task Drag Handles</span>
+            <input
+              aria-label="Task Drag Handles"
+              checked={dragHandlesEnabled}
+              className="settings-switch-input"
+              disabled={emailSettingsMutation.isPending || !smtpStatus}
+              onChange={toggleDragHandles}
+              role="switch"
+              type="checkbox"
+            />
+          </label>
+        </div>
+
+        <div className="settings-item">
+          <div className="settings-item-header">
+            <strong>Guest Access</strong>
+            <span>{guestAccessEnabled ? "On" : "Off"}</span>
+          </div>
+          <p className="toolbar-hint">
+            Show or hide the login screen guest viewer entry point.
+          </p>
+          <label className="settings-switch">
+            <span className="settings-switch-label">Guest Access</span>
+            <input
+              aria-label="Guest Access"
+              checked={guestAccessEnabled}
+              className="settings-switch-input"
+              disabled={emailSettingsMutation.isPending || !smtpStatus}
+              onChange={toggleGuestAccess}
+              role="switch"
+              type="checkbox"
+            />
+          </label>
+        </div>
+
+        <div className="settings-item settings-item-wide">
           <label className="settings-field">
             <span>SMTP URL ({smtpStatus?.smtpUrlSource ?? "environment"})</span>
             <input
@@ -6143,7 +6166,9 @@ function SettingsPanel({
             />
           </label>
           <label className="settings-field">
-            <span>From address ({smtpStatus?.fromAddressSource ?? "environment"})</span>
+            <span>
+              From address ({smtpStatus?.fromAddressSource ?? "environment"})
+            </span>
             <input
               type="email"
               value={emailConfig.fromAddress}
@@ -6181,72 +6206,88 @@ function SettingsPanel({
             }
             type="button"
           >
-            {emailSettingsMutation.isPending ? "Saving..." : "Save email config"}
+            {emailSettingsMutation.isPending
+              ? "Saving..."
+              : "Save email config"}
           </button>
         </div>
-        <div
-          className="settings-item settings-item-toggle"
-          onClick={toggleDragHandles}
-        >
-          <div className="settings-item-header">
-            <strong>Task Drag Handles</strong>
-            <span>{dragHandlesEnabled ? "On" : "Off"}</span>
-          </div>
-          <p className="toolbar-hint">
-            Show or hide manual task-reorder handles for the whole workspace.
-          </p>
-          {emailPrefError ? (
-            <p className="error-banner">{emailPrefError}</p>
-          ) : null}
-          <label
-            className="settings-switch"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <span className="settings-switch-label">Task Drag Handles</span>
-            <input
-              aria-label="Task Drag Handles"
-              checked={dragHandlesEnabled}
-              className="settings-switch-input"
-              disabled={
-                emailSettingsMutation.isPending || !smtpStatus
-              }
-              onChange={toggleDragHandles}
-              role="switch"
-              type="checkbox"
-            />
-          </label>
+      </div>
+    </section>
+  );
+}
+
+type SettingsPanelProps = {
+  adminAuditPanel: AdminAuditReportType | null;
+  isBackupsOpen: boolean;
+  isAdmin: boolean;
+  isEmailConfigOpen: boolean;
+  isImportExportOpen: boolean;
+  isLocalAccountsOpen: boolean;
+  onToggleAdminAuditPanel: (panel: AdminAuditReportType) => void;
+  onToggleBackupsPanel: () => void;
+  onToggleEmailConfigPanel: () => void;
+  onToggleImportExportPanel: () => void;
+  onToggleLocalAccounts: () => void;
+  onToggleRetentionPanel: () => void;
+  retentionOpen: boolean;
+};
+
+function SettingsPanel({
+  adminAuditPanel,
+  isBackupsOpen,
+  isAdmin,
+  isEmailConfigOpen,
+  isImportExportOpen,
+  isLocalAccountsOpen,
+  onToggleAdminAuditPanel,
+  onToggleBackupsPanel,
+  onToggleEmailConfigPanel,
+  onToggleImportExportPanel,
+  onToggleLocalAccounts,
+  onToggleRetentionPanel,
+  retentionOpen,
+}: SettingsPanelProps) {
+  if (!isAdmin) {
+    return null;
+  }
+
+  return (
+    <section className="workspace-panel-card">
+      <header className="panel-header">
+        <div>
+          <strong>Settings</strong>
+          <span>Workspace-wide admin controls, tools, and system reports.</span>
         </div>
+        <div className="settings-version">
+          <div className="settings-version-row">
+            <a
+              className="settings-link settings-version-link"
+              href={appChangelogUrl}
+              rel="noreferrer"
+              target="_blank"
+              title="View changelog on GitHub"
+            >
+              {`${appName} ${buildShaLabel}`}
+            </a>
+          </div>
+          <BuildDateLabel />
+        </div>
+      </header>
+
+      <div className="settings-grid">
         <div
+          aria-expanded={isEmailConfigOpen}
           className="settings-item settings-item-toggle"
-          onClick={toggleGuestAccess}
+          {...settingsCardButtonProps(onToggleEmailConfigPanel)}
         >
           <div className="settings-item-header">
-            <strong>Guest Access</strong>
-            <span>{guestAccessEnabled ? "On" : "Off"}</span>
+            <strong>Email config</strong>
+            <span>{isEmailConfigOpen ? "Open" : "Closed"}</span>
           </div>
           <p className="toolbar-hint">
-            Show or hide the login screen guest viewer entry point.
+            Open email settings to configure SMTP delivery and workspace
+            controls.
           </p>
-          {emailPrefError ? (
-            <p className="error-banner">{emailPrefError}</p>
-          ) : null}
-          <label
-            className="settings-switch"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <span className="settings-switch-label">Guest Access</span>
-            <input
-              aria-label="Guest Access"
-              checked={guestAccessEnabled}
-              className="settings-switch-input"
-              disabled={
-                emailSettingsMutation.isPending || !smtpStatus
-              }
-              onChange={toggleGuestAccess}
-              role="switch"
-              type="checkbox"
-            />
-          </label>
         </div>
         <div
           aria-expanded={isBackupsOpen}
@@ -6346,7 +6387,6 @@ function SettingsPanel({
           </p>
         </div>
       </div>
-
     </section>
   );
 }
