@@ -28,7 +28,7 @@ spec:
         - name: postgres
           # Internal/BSI lane: Bitnami Secure Image from Artifactory (pull via repo.ops).
           # Source of truth: infra/images/bsi-postgresql.pin.json (sync with scripts/sync-bsi-pins.mjs).
-          image: repo.ops.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql@sha256:b5ccd411fecc5e509874133aa89c0bc3927e2bdf1310ff8acb4bc9581f773064
+          image: repo.ops.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql@sha256:c093b0269a7224f18448f6c0722e65b8e98c6e32e13b6d638f9bbf127d623a0d
           imagePullPolicy: IfNotPresent
           securityContext:
             seccompProfile:
