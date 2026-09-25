@@ -10,7 +10,7 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
-## 0.9.26 - 2026-09-25
+## 0.9.26 - 2026-09-25 - sha-0404e2b
 
 - chore(deps-dev): bump the npm-development-tooling group with 13 updates
 - chore(deps-dev): bump vitest from 4.1.11 to 5.0.1
