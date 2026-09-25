@@ -10,6 +10,16 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+## 0.9.26 - 2026-09-25 - sha-0404e2b
+
+- chore(deps-dev): bump the npm-development-tooling group with 13 updates
+- chore(deps-dev): bump vitest from 4.1.11 to 5.0.1
+- chore(bsi): trigger postgresql pin validation
+- chore(bsi): trigger postgresql pin validation
+- chore(bsi): trigger postgresql pin validation
+- chore(bsi): trigger postgresql pin validation
+- chore(bsi): refresh postgresql candidate
+
 ## 0.9.25 - 2026-09-11 - sha-0ce7bcd
 
 - Added a fail-closed High/Critical Trivy scan on internal Artifactory publishes (`build-and-publish-internal` and `refresh-internal`) so a new finding fails the job and therefore `deploy-tavi-dev`.
