@@ -10,6 +10,8 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+- Fixed scheduled release recovery incorrectly skipping valid release commits under `pipefail`, and pin recovered tags to the original default-branch integration commit.
+
 ## 0.9.26 - 2026-09-25 - sha-0404e2b
 
 - chore(deps-dev): bump the npm-development-tooling group with 13 updates

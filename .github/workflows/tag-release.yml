@@ -73,16 +73,44 @@ jobs:
             range="${before}..HEAD"
           fi
 
-          if ! git log --format=%s "$range" | grep -qx "Release ${version}"; then
+          escaped_version="${version//./\\.}"
+          release_commit="$(git log \
+            --format=%H \
+            --grep="^Release ${escaped_version}$" \
+            -n 1 \
+            "$range")"
+          if [[ -z "$release_commit" ]]; then
             echo "No 'Release ${version}' commit in ${range}; skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+
+          first_parent_release="$(git log \
+            --first-parent \
+            --format=%H \
+            --grep="^Release ${escaped_version}$" \
+            -n 1 \
+            HEAD)"
+          if [[ "$first_parent_release" == "$release_commit" ]]; then
+            target_sha="$release_commit"
+          else
+            mapfile -t integration_commits < <(git rev-list \
+              --first-parent \
+              --reverse \
+              --ancestry-path \
+              "${release_commit}..HEAD")
+            target_sha="${integration_commits[0]:-}"
+          fi
+          if [[ -z "$target_sha" ]]; then
+            echo "Release commit ${release_commit} is not integrated into the default branch." >&2
+            exit 1
           fi
 
           {
             echo "skip=false"
             echo "version=$version"
             echo "tag=$tag"
+            echo "target_sha=$target_sha"
           } >> "$GITHUB_OUTPUT"
 
       - name: Create annotated tag and GitHub Release
@@ -91,6 +119,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.detect.outputs.version }}
           TAG: ${{ steps.detect.outputs.tag }}
+          TARGET_SHA: ${{ steps.detect.outputs.target_sha }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -107,10 +136,10 @@ jobs:
             echo "- Release ${VERSION}" > "$notes_file"
           fi
 
-          git tag -a "$TAG" -m "Release ${VERSION}"
+          git tag -a "$TAG" "$TARGET_SHA" -m "Release ${VERSION}"
           git push origin "$TAG"
 
           gh release create "$TAG" \
             --title "Tavi ${VERSION}" \
             --notes-file "$notes_file" \
-            --target "${{ github.sha }}"
+            --target "$TARGET_SHA"
