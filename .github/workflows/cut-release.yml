@@ -2,8 +2,10 @@ name: Cut weekly release
 
 on:
   schedule:
-    # Friday 13:00 UTC ≈ 08:00 America/Chicago during CDT, 07:00 during CST.
+    # GitHub Actions schedules are UTC-only. The gate below admits only the
+    # invocation that is 08:00 in America/Chicago across DST transitions.
     - cron: "0 13 * * 5"
+    - cron: "0 14 * * 5"
   workflow_dispatch:
     inputs:
       bump:
@@ -25,10 +27,30 @@ permissions:
   pull-requests: write
 
 jobs:
+  schedule-gate:
+    name: Confirm Central release time
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.central-time.outputs.should_run }}
+    steps:
+      - name: Check Central time
+        id: central-time
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]] || [[ "$(TZ=America/Chicago date +%H)" == "08" ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping duplicate UTC schedule outside 08:00 America/Chicago."
+          fi
+
   cut-release:
     name: Cut release PR
     runs-on: ubuntu-latest
-    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs: schedule-gate
+    if: needs.schedule-gate.outputs.should_run == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     steps:
       - name: Check out repository
         uses: actions/checkout@v7

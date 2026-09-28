@@ -13,7 +13,7 @@ scanning. See [`DOCKER.md`](./DOCKER.md) and
 Product versions are cut on a Friday schedule separate from Dependabot:
 
 1. Monday-oriented dependency updates land through Dependabot and auto-merge.
-2. Friday 13:00 UTC (`Cut weekly release`) opens a version PR from current `main` when there are commits or Unreleased changelog notes since the previous release.
+2. Friday at 8:00 AM America/Chicago (`Cut weekly release`) opens a version PR from current `main` when there are commits or Unreleased changelog notes since the previous release.
 3. The release PR bumps workspace package versions, folds `CHANGELOG.md` Unreleased entries into `x.y.z`, and auto-merges after required checks.
 4. `Tag release` creates the annotated `vx.y.z` tag and GitHub Release.
 5. The existing publish workflow reacts to the `v*` tag, publishes images, and opens the release-pin PR for Compose/Kubernetes promotion.

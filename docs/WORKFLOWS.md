@@ -147,7 +147,7 @@ Private lane only.
 
 ### Cut weekly release
 
-`cut-release.yml` — Fridays 13:00 UTC or manual. Opens `Release x.y.z` when
+`cut-release.yml` — Fridays at 8:00 AM America/Chicago or manual. Opens `Release x.y.z` when
 `main` has work since the last release. Patch by default; minor when Unreleased
 has `### Features` or `### Breaking Changes`. Enables auto-merge after required
 checks.

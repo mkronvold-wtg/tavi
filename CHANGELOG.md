@@ -10,6 +10,8 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+- Fixed scheduled release recovery incorrectly skipping valid release commits under `pipefail`, and pin recovered tags to the original default-branch integration commit.
+
 ## 0.9.25 - 2026-09-11 - sha-0ce7bcd
 
 - Added a fail-closed High/Critical Trivy scan on internal Artifactory publishes (`build-and-publish-internal` and `refresh-internal`) so a new finding fails the job and therefore `deploy-tavi-dev`.
