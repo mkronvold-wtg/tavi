@@ -15,7 +15,7 @@
     "@prisma/client": "^7.10.0",
     "@tavi/config": "workspace:*",
     "@tavi/schemas": "workspace:*",
-    "csv-parse": "^7.0.2",
+    "csv-parse": "^7.0.3",
     "nodemailer": "^10.0.10",
     "prom-client": "^15.1.3"
   },
