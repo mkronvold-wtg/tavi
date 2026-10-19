@@ -5,7 +5,7 @@
   "source_image": "sv4.art.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql",
   "pull_image": "repo.ops.e2open.com/bitnami-docker-secure/containers/debian-12/postgresql",
   "candidate_tag": "latest",
-  "digest": "sha256:d83e1366869fcaf760b1393bea2fee567fcd46839cea482ca872028145026df8",
+  "digest": "sha256:ba378fed19df209cdb8aec0e269e3da5fb329cdbb81b3eb619d443905411ea48",
   "app_version": "18.6.0",
   "run_as_user": 1001,
   "run_as_group": 1001,
