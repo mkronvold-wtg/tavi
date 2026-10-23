@@ -10,6 +10,7 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+- Updated runtime `fast-uri` overrides to 3.1.7/4.1.4 to fix CVE-2026-84292 and CVE-2026-84394.
 - Fixed scheduled release recovery incorrectly skipping valid release commits under `pipefail`, and pin recovered tags to the original default-branch integration commit.
 
 ## 0.9.26 - 2026-09-25 - sha-0404e2b
