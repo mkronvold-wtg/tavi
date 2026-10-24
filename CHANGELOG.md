@@ -10,6 +10,7 @@ Use optional markers under Unreleased to control the bump:
 
 ## Unreleased
 
+- Updated direct and transitive Zod dependencies to 4.6.7, beyond Trivy's minimum patched version for CVE-2023-54404; unbounded container validation still requires application-level size limits.
 - Refreshed official Node 26.12.1 builder/runtime image digests, retaining Debian bookworm/trixie variants and runtime security upgrades.
 - Updated runtime `fast-uri` overrides to 3.1.7/4.1.4 to fix CVE-2026-84292 and CVE-2026-84394.
 - Removed the stale NestJS Fastify override that forced vulnerable 5.11.0 instead of the adapter's supported 5.12.4.
