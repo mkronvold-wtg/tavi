@@ -31,6 +31,11 @@ The publish and refresh workflows run:
 5. `corepack pnpm typecheck`
 6. `corepack pnpm test`
 
+The API test command runs both unit tests and the database-free Fastify
+observability e2e suite. Run just that e2e suite with
+`corepack pnpm --filter @tavi/api test:e2e --runInBand`. Its Jest configuration
+uses the same TypeScript 6 and ESM settings as the API unit tests.
+
 Image builds are independent per service. Every pull request creates the
 required workspace, image-build, and image-scan check runs. Pull requests that
 do not modify container-relevant inputs skip those jobs successfully; changes

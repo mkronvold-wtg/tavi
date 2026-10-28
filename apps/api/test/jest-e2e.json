@@ -1,9 +1,25 @@
 {
   "moduleFileExtensions": ["js", "json", "ts"],
-  "rootDir": ".",
+  "rootDir": "..",
+  "roots": ["<rootDir>/test"],
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
+  "moduleNameMapper": {
+    "^@tavi/config$": "<rootDir>/../../packages/config/src/index.ts",
+    "^@tavi/config/observability$": "<rootDir>/../../packages/config/src/observability.ts",
+    "^@tavi/schemas$": "<rootDir>/../../packages/schemas/src/index.ts",
+    "^(\\.{1,2}/.*)\\.js$": "$1"
+  },
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
-  }
+    "^.+\\.(t|j)s$": [
+      "ts-jest",
+      {
+        "tsconfig": "tsconfig.spec.json",
+        "useESM": true
+      }
+    ]
+  },
+  "extensionsToTreatAsEsm": [".ts"],
+  "transformIgnorePatterns": ["/node_modules/(?!(?:@nestjs|rxjs)/)"],
+  "setupFilesAfterEnv": ["<rootDir>/test/jest.setup.ts"]
 }
